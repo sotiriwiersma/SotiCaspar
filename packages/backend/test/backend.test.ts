@@ -151,6 +151,36 @@ describe('backend with an AMCP server', () => {
     await waitFor(async () => (await backend.getLibrary()).length === 0);
   });
 
+  it('removes live streams an earlier run left behind, once per session', async () => {
+    const server = await startServer();
+    const { statuses } = await startBackend([device('Main', server.port)], { streamPort: 19250 });
+    const removes = () => server.received.filter((c) => c.startsWith('REMOVE'));
+
+    // The server has 2 channels: both are cleaned of streams to this PC's port, nothing else.
+    await waitFor(() => removes().length === 2);
+    expect(removes()).toEqual(['REMOVE 1 STREAM udp://<client_ip_address>:19250', 'REMOVE 2 STREAM udp://<client_ip_address>:19250']);
+
+    // A reconnect within the session keeps the streams it started itself.
+    const connects = statuses.filter((s) => s.connected).length;
+    server.dropConnections();
+    await waitFor(() => statuses.filter((s) => s.connected).length > connects);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(removes()).toHaveLength(2);
+  });
+
+  it('removes a leftover stream on the channel before starting the live stream', async () => {
+    const server = await startServer();
+    const { backend } = await startBackend([device('Main', server.port)], { streamPort: 19251 });
+    await waitFor(() => server.received.filter((c) => c.startsWith('REMOVE')).length === 2);
+    server.received.length = 0;
+
+    await backend.startLiveStream({ deviceName: 'Main', channel: 2, key: false, large: false });
+    const sent = server.received.filter((c) => c.startsWith('REMOVE') || c.startsWith('ADD'));
+    expect(sent[0]).toBe('REMOVE 2 STREAM udp://<client_ip_address>:19251');
+    expect(sent[1]).toMatch(/^ADD 2 STREAM udp:\/\/<client_ip_address>:19251 /);
+    await backend.stopLiveStream();
+  });
+
   it('keeps shadow devices out of the library', async () => {
     const server = await startServer();
     const { backend } = await startBackend([device('Shadow', server.port, { shadow: true })]);

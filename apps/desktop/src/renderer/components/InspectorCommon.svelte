@@ -1,9 +1,10 @@
 <script lang="ts">
   import { commonFields } from '../lib/common';
-  import { channelFormats } from '../engine/devices';
+  import { channelFormats, channelFps } from '../engine/devices';
   import { isGroupNode, type TreeNode } from '../engine/tree';
   import { applyCommonProp, applyCurrentProp, applyItemField } from '../stores/inspector';
   import { app } from '../stores/app.svelte';
+  import TimeInput from './TimeInput.svelte';
 
   interface Props {
     node: TreeNode;
@@ -16,7 +17,10 @@
   const deviceName = $derived(isGroupNode(node) ? '' : node.deviceName);
   const channelCount = $derived(device ? Math.max(1, channelFormats(device).length) : 1);
   const lockedChannel = $derived(device && device.lockedChannel > 0 && device.lockedChannel <= channelCount ? device.lockedChannel : 0);
-  const unit = $derived(app.settings.delayType === 'Frames' ? 'frm' : 'ms');
+  const timecode = $derived(app.settings.delayType === 'Timecode');
+  const unit = $derived(app.settings.delayType === 'Milliseconds' ? 'ms' : 'frm');
+  // Delay and duration count frames of the item's channel in frame and timecode mode.
+  const fps = $derived(channelFps(device, Number(node.props.channel) || 1));
   const allowRemote = $derived(node.props.allowremotetriggering === true || node.props.allowremotetriggering === 'true');
   const allowGpi = $derived(node.props.allowgpi === true || node.props.allowgpi === 'true');
   const knownDevice = $derived(app.targetDevices.some((d) => d.name === deviceName));
@@ -60,8 +64,12 @@
     <div class="field">
       <label for="insp-delay">Delay</label>
       <span class="with-unit">
-        <input id="insp-delay" type="number" min="-1" value={Number(node.props.delay)} oninput={(e) => setNumber(e, 'delay', 'delay', -1)} />
-        <span class="muted">{unit}</span>
+        {#if timecode}
+          <TimeInput id="insp-delay" value={Number(node.props.delay)} {fps} dropFrame={app.settings.useDropFrameNotation} min={-1} onchange={(v) => applyCommonProp('delay', 'delay', v)} />
+        {:else}
+          <input id="insp-delay" type="number" min="-1" value={Number(node.props.delay)} oninput={(e) => setNumber(e, 'delay', 'delay', -1)} />
+          <span class="muted">{unit}</span>
+        {/if}
       </span>
     </div>
   {/if}
@@ -69,8 +77,12 @@
     <div class="field">
       <label for="insp-duration">Duration</label>
       <span class="with-unit">
-        <input id="insp-duration" type="number" min="0" max="99999" value={Number(node.props.duration)} oninput={(e) => setNumber(e, 'duration', 'duration', 0, 99999)} />
-        <span class="muted">{unit}</span>
+        {#if timecode}
+          <TimeInput id="insp-duration" value={Number(node.props.duration)} {fps} dropFrame={app.settings.useDropFrameNotation} min={0} max={99999} onchange={(v) => applyCommonProp('duration', 'duration', v)} />
+        {:else}
+          <input id="insp-duration" type="number" min="0" max="99999" value={Number(node.props.duration)} oninput={(e) => setNumber(e, 'duration', 'duration', 0, 99999)} />
+          <span class="muted">{unit}</span>
+        {/if}
       </span>
     </div>
   {/if}

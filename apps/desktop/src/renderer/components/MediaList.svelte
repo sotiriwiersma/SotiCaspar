@@ -92,9 +92,6 @@
         <span class="icon">{ICONS[entry.type]}</span>
         <span class="name">{entry.name}</span>
         {#if entry.timecode}<span class="time muted">{libraryTimecode(entry.timecode, app.settings.useDropFrameNotation)}</span>{/if}
-        {#if (entry.type === 'MOVIE' || entry.type === 'STILL') && entry.thumbnail && app.settings.showThumbnailTooltip}
-          <img class="tooltip" src="data:image/png;base64,{entry.thumbnail}" alt="" draggable="false" />
-        {/if}
       </div>
     {/snippet}
   </VirtualList>
@@ -138,21 +135,6 @@
     width: 16px;
     text-align: center;
     color: var(--text-dim);
-  }
-
-  .tooltip {
-    display: none;
-    position: absolute;
-    left: 40px;
-    top: 22px;
-    z-index: 50;
-    max-width: 260px;
-    border: 1px solid var(--border);
-    pointer-events: none;
-  }
-
-  .entry:hover .tooltip {
-    display: block;
   }
 
   .empty {

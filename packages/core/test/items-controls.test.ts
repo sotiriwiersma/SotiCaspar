@@ -345,3 +345,33 @@ describe('control item playout', () => {
     }
   });
 });
+
+describe('Companion button', () => {
+  const def = () => getItemDefinition('COMPANIONBUTTON')!;
+  const item = (props: Props = {}) => createItem('COMPANIONBUTTON', { props });
+
+  it('starts on Companion on this PC, page 1, the first button, press', () => {
+    expect(item().props).toMatchObject({ host: '127.0.0.1', port: 8000, page: 1, row: 0, column: 0, action: 'Press' });
+  });
+
+  it('presses, holds or releases a button through the HTTP remote control', () => {
+    const effects = (props: Props) => buildEffects(def(), item(props), 'play', IDLE_STATE);
+    expect(effects({ page: 2, row: 1, column: 4 })).toEqual([{ kind: 'http', method: 'POST', url: 'http://127.0.0.1:8000/api/location/2/1/4/press', data: [] }]);
+    expect(effects({ host: 'http://10.0.0.9/', port: 8888, action: 'Down' })[0]).toMatchObject({ url: 'http://10.0.0.9:8888/api/location/1/0/0/down' });
+    expect(effects({ action: 'up' })[0]).toMatchObject({ url: 'http://127.0.0.1:8000/api/location/1/0/0/up' });
+  });
+
+  it('does nothing without a complete address', () => {
+    for (const props of [{ host: '' }, { page: 0 }, { row: -1 }, { port: 0 }, { action: 'Rotate' }]) {
+      expect(resolveTrigger(def(), item(props), 'Play', IDLE_STATE).op, JSON.stringify(props)).toBeNull();
+    }
+    expect(resolveTrigger(def(), item(), 'Play', IDLE_STATE).op).not.toBeNull();
+  });
+
+  it('keeps its button in the rundown file', () => {
+    const written = serializeRundown({ items: [item({ host: 'companion.local', port: 8001, page: 3, row: 2, column: 7, action: 'Down' })] } as never);
+    const read = parseRundown(written).items[0] as RundownItem;
+    expect(read.type).toBe('COMPANIONBUTTON');
+    expect(read.props).toMatchObject({ host: 'companion.local', port: 8001, page: 3, row: 2, column: 7, action: 'Down' });
+  });
+});

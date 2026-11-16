@@ -4,8 +4,10 @@
   import { ACTIVE_COLOR, isTransparent } from '../lib/colors';
   import { commonFields } from '../lib/common';
   import { COMPACT_ROW_HEIGHT, ROW_HEIGHT, LIBRARY_TYPE_OF_ITEM, rowLabel, typeColor, typeTitle } from '../lib/definitions';
-  import { fromMilliseconds, libraryTimecode } from '../lib/timecode';
+  import { channelFps } from '../engine/devices';
+  import { framesToTimecode, fromMilliseconds, libraryTimecode } from '../lib/timecode';
   import { app } from '../stores/app.svelte';
+  import { hasMedia, layerStates } from '../stores/layerStates.svelte';
   import { rowOsc } from '../stores/osc.svelte';
   import { workspace } from '../stores/workspace.svelte';
   import OscTime from './OscTime.svelte';
@@ -46,8 +48,22 @@
   const disconnected = $derived(device !== '' && !app.isConnected(device));
   const background = $derived(isTransparent(p.color) ? undefined : String(p.color));
   const groupDuration = $derived(group ? Number(p.duration ?? 0) : 0);
-  const delayUnit = $derived(app.settings.delayType === 'Frames' ? 'frm' : 'ms');
-  const state = $derived(runtime.playing ? (runtime.paused ? 'paused' : 'playing') : runtime.loaded ? 'loaded' : '');
+  const delayText = $derived.by(() => {
+    const { delayType, useDropFrameNotation } = app.settings;
+    const value = Number(p.delay);
+    if (delayType === 'Timecode') return framesToTimecode(value, channelFps(app.deviceByName(device), Number(p.channel) || 1), useDropFrameNotation);
+    return `${p.delay} ${delayType === 'Milliseconds' ? 'ms' : 'frm'}`;
+  });
+  // Only a trigger that just happened flashes. A row created later (moved, scrolled into view) joins the
+  // animation where it would be by now, or does not flash at all.
+  const FLASH_MS = 450;
+  const flashAge = $derived.by(() => (runtime.flash > 0 ? Date.now() - runtime.flashAt : Infinity));
+  // Straight from the server: only items with a clip of their own can be recognised on their layer.
+  const server = $derived.by(() => {
+    layerStates.revision;
+    return isGroupNode(node) || !hasMedia(node.type) ? null : layerStates.stateOf(node);
+  });
+  const state = $derived(!server ? '' : server.playing ? (server.paused ? 'paused' : 'playing') : server.loaded ? 'loaded' : '');
 </script>
 
 <div
@@ -69,7 +85,7 @@
 >
   <span class="active-bar" style:background={active ? ACTIVE_COLOR : undefined}></span>
   {#key runtime.flash}
-    {#if runtime.flash > 0}<span class="flash"></span>{/if}
+    {#if flashAge < FLASH_MS}<span class="flash {runtime.flashKind}" style:animation-delay="{-flashAge}ms"></span>{/if}
   {/key}
   <span class="type-bar" style:background={typeColor(node.type)}></span>
   {#if row.depth === 1}<span class="group-bar"></span>{/if}
@@ -101,7 +117,7 @@
         {#if common.device}<span class:missing={device === ''}>Server: {device}</span>{/if}
         {#if common.channel}<span>Channel: {p.channel}</span>{/if}
         {#if common.layer}<span>Video layer: {p.videolayer}</span>{/if}
-        {#if common.delay}<span>Delay: {p.delay} {delayUnit}</span>{/if}
+        {#if common.delay}<span>Delay: {delayText}</span>{/if}
         {#if flag('allowremotetriggering') && String(p.remotetriggerid ?? '') !== ''}<span>UID: {p.remotetriggerid}</span>{/if}
         {#if groupDuration > 0}<span>Duration: {fromMilliseconds(groupDuration, app.settings.useDropFrameNotation)}</span>{/if}
         {#if group && String(p.notes ?? '') !== ''}<span class="note">{p.notes}</span>{/if}
@@ -160,6 +176,14 @@
     background: rgba(0, 255, 0, 0.35);
     pointer-events: none;
     animation: flash 450ms ease-out forwards;
+  }
+
+  .flash.stop {
+    background: rgba(255, 40, 40, 0.4);
+  }
+
+  .flash.other {
+    background: rgba(70, 140, 255, 0.4);
   }
 
   @keyframes flash {

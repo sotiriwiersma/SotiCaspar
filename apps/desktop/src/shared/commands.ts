@@ -16,7 +16,7 @@ export type CommandId =
   | 'view.audioLevels'
   | 'view.preview'
   | 'view.live'
-  | 'view.duration'
+  | 'view.countdown'
   | 'library.refresh'
   | 'rundown.markUsed'
   | 'rundown.markUnused'
@@ -66,7 +66,7 @@ export const COMMANDS: Record<CommandId, CommandInfo> = {
   'view.audioLevels': { label: 'Audio Levels Panel', checkbox: true },
   'view.preview': { label: 'Preview Panel', checkbox: true },
   'view.live': { label: 'Live Panel', checkbox: true },
-  'view.duration': { label: 'Duration Panel', checkbox: true },
+  'view.countdown': { label: 'Countdown Bar', checkbox: true },
   'library.refresh': { label: 'Refresh Library', accelerator: 'CmdOrCtrl+R' },
   'rundown.markUsed': { label: 'As Used' },
   'rundown.markUnused': { label: 'As Unused' },
@@ -121,7 +121,7 @@ export const MENU: readonly { label: string; entries: readonly MenuEntry[] }[] =
     entries: [
       c('view.fullscreen'), SEP,
       c('view.compact'), SEP,
-      c('view.audioLevels'), c('view.preview'), c('view.live'), c('view.duration')
+      c('view.audioLevels'), c('view.preview'), c('view.live'), c('view.countdown')
     ]
   },
   { label: 'Library', entries: [c('library.refresh')] },

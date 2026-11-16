@@ -20,7 +20,8 @@ const PRESET_FILTER = [{ name: 'Preset', extensions: ['xml'] }];
 
 /** UI state of the library panel plus the filtered views of the server library. */
 class LibraryState {
-  tab = $state<LibraryTab>('tools');
+  /** The Video tab is where clips are added from: it is what the library shows on start. */
+  tab = $state<LibraryTab>('MOVIE');
   text = $state('');
   /** Device names to show; empty means all ("All" in the Qt device filter). */
   devices = $state.raw<ReadonlySet<string>>(new Set());

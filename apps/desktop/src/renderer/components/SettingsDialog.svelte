@@ -3,14 +3,16 @@
   import { backend } from '../lib/backend';
   import { app } from '../stores/app.svelte';
   import { ui } from '../stores/ui.svelte';
+  import ClipDefaultsEditor from './ClipDefaultsEditor.svelte';
   import DeviceDialog from './DeviceDialog.svelte';
   import ImportDevicesDialog from './ImportDevicesDialog.svelte';
   import Modal from './Modal.svelte';
   import OscOutputDialog from './OscOutputDialog.svelte';
 
-  type Tab = 'general' | 'stream' | 'devices' | 'gpi' | 'osc';
+  type Tab = 'general' | 'clips' | 'stream' | 'devices' | 'gpi' | 'osc';
   const TABS: ReadonlyArray<{ id: Tab; title: string }> = [
     { id: 'general', title: 'General' },
+    { id: 'clips', title: 'New clips' },
     { id: 'stream', title: 'Live Stream' },
     { id: 'devices', title: 'Devices' },
     { id: 'gpi', title: 'GPI' },
@@ -99,6 +101,7 @@
         <label class="row">Delay and duration
           <select value={s.delayType} onchange={(e) => set('delayType', e.currentTarget.value as AppSettings['delayType'])}>
             <option value="Frames">Frames</option>
+            <option value="Timecode">Timecode (hh:mm:ss:ff)</option>
             <option value="Milliseconds">Milliseconds</option>
           </select>
         </label>
@@ -108,7 +111,7 @@
         <label class="check"><input type="checkbox" checked={s.showAudioLevelsPanel} onchange={bool('showAudioLevelsPanel')} /> Show audio levels panel</label>
         <label class="check"><input type="checkbox" checked={s.showPreviewPanel} onchange={bool('showPreviewPanel')} /> Show preview panel</label>
         <label class="check"><input type="checkbox" checked={s.showLivePanel} onchange={bool('showLivePanel')} /> Show live panel</label>
-        <label class="check"><input type="checkbox" checked={s.showDurationPanel} onchange={bool('showDurationPanel')} /> Show duration panel</label>
+        <label class="check"><input type="checkbox" checked={s.showCountdownBar} onchange={bool('showCountdownBar')} /> Show countdown bar</label>
       </fieldset>
       <fieldset>
         <legend>Rundown repository</legend>
@@ -116,8 +119,9 @@
         <label class="row">Port<input type="number" min="1" max="65535" value={s.repositoryPort} onchange={integer('repositoryPort', 1)} /></label>
         <p class="muted note">The repository is not part of this version; the values are kept.</p>
       </fieldset>
+    {:else if tab === 'clips'}
+      <ClipDefaultsEditor />
     {:else if tab === 'stream'}
-      <p class="muted note">The preview and live panels are not part of this version; the values are kept for them.</p>
       <fieldset>
         <legend>Live stream</legend>
         <label class="row">Quality<span><input type="number" min="0" max="100" value={s.streamQuality} onchange={integer('streamQuality')} /> %</span></label>
@@ -236,8 +240,11 @@
     border-bottom-color: var(--accent);
   }
 
+  /* One size for every page, so the dialog does not move when switching between them. */
   .page {
-    min-height: 320px;
+    height: min(560px, calc(92vh - 240px));
+    overflow-y: auto;
+    padding-right: 4px;
   }
 
   fieldset {

@@ -80,7 +80,7 @@ class BackendImpl implements Backend {
       log,
       timing: options.timing,
       onStatus: (status) => this.emitter.emit('device-status', status),
-      onConnected: (name) => void this.refreshDevice(name),
+      onConnected: (name) => void this.deviceConnected(name),
       onInfo: (name, info) => void this.store.updateDeviceInfo(name, info).catch((error) => log('error', `Cannot save device info: ${String(error)}`)),
       onRemoved: (name) => void this.library.removeDevice(name).catch((error) => log('error', `Cannot clear library of ${name}: ${String(error)}`))
     });
@@ -268,6 +268,8 @@ class BackendImpl implements Backend {
       const url = await this.streamRelay.open(port);
       const profile = request.large ? amcp.WEB_STREAM_PROFILES.large : amcp.WEB_STREAM_PROFILES.compact;
       try {
+        // A stream to this PC's port left on the channel by an earlier run would be encoded twice for nothing.
+        await this.devices.send(request.deviceName, amcp.stopStream(request.channel, port)).catch(() => undefined);
         const response = await this.devices.send(request.deviceName, amcp.startWebStream(request.channel, port, request.key, profile));
         if (!isSuccess(response)) throw new Error(`${request.deviceName} refused the stream: ${response.header}`);
       } catch (error) {
@@ -340,6 +342,40 @@ class BackendImpl implements Backend {
   }
 
   /** Reads server info and library of a device; shadow devices only mirror playout and have none. */
+  /** Devices whose leftover streams were already removed: once per session, so a reconnect keeps our own stream. */
+  private readonly streamsCleaned = new Set<string>();
+
+  private async deviceConnected(name: string): Promise<void> {
+    try {
+      await this.refreshDevice(name);
+    } finally {
+      if (!this.streamsCleaned.has(name)) {
+        this.streamsCleaned.add(name);
+        await this.removeLeftoverStreams(name);
+      }
+    }
+  }
+
+  /**
+   * Removes live streams an earlier run left on a server: when the app crashes or is forced to quit it cannot remove its
+   * stream, and the server keeps encoding it for nobody. Only streams to this PC's stream port are touched (the server
+   * fills in this PC's address). Runs in the live stream queue and skips a server this session streams from, so it never
+   * removes the stream the Live panel just started.
+   */
+  private removeLeftoverStreams(name: string): Promise<void> {
+    return this.serializeLive(async () => {
+      if (this.liveStream?.deviceName === name || !this.devices.isConnected(name) || this.devices.config(name)?.shadow) return;
+      const port = this.store.settings().streamPort;
+      const channels = Math.max(1, this.store.devices().find((d) => d.name === name)?.channels ?? 1);
+      let removed = 0;
+      for (let channel = 1; channel <= channels; channel++) {
+        const response = await this.devices.send(name, amcp.stopStream(channel, port)).catch(() => undefined);
+        if (response && isSuccess(response)) removed++;
+      }
+      if (removed > 0) this.log('info', `Removed ${removed} live stream(s) an earlier run left on ${name}`);
+    });
+  }
+
   private async refreshDevice(name: string): Promise<void> {
     if (this.devices.config(name)?.shadow) return;
     await Promise.all([

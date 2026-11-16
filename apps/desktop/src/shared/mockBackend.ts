@@ -73,7 +73,7 @@ export class MockBackend implements BackendApi {
   readonly sent: DeviceCommands[] = [];
   readonly sentCustom: Array<{ deviceName: string; command: string }> = [];
 
-  private settings: AppSettings = { ...DEFAULT_SETTINGS, showDurationPanel: true };
+  private settings: AppSettings = { ...DEFAULT_SETTINGS };
   private devices: DeviceConfig[] = [
     device('Studio A', '192.168.1.10', { channels: 3, previewChannel: 3, description: 'Main playout' }),
     device('Studio B', '192.168.1.11', { channels: 2, channelFormats: '720p5000,PAL' })
@@ -158,6 +158,7 @@ export class MockBackend implements BackendApi {
 
   async sendCustomCommand(deviceName: string, command: string): Promise<string> {
     this.sentCustom.push({ deviceName, command });
+    this.trackSeek(deviceName, command);
     return '202 OK';
   }
 
@@ -249,6 +250,17 @@ export class MockBackend implements BackendApi {
         entry.paused = false;
       } else this.playing.delete(key);
     }
+  }
+
+  /** `CALL <channel>-<layer> SEEK <frame>`: the simulated 50 fps clip jumps to that frame. */
+  private trackSeek(deviceName: string, command: string): void {
+    const seek = /^CALL (\d+)-(\d+) SEEK (\d+)/i.exec(command);
+    if (!seek) return;
+    const entry = this.playing.get(`${deviceName}|${seek[1]}|${seek[2]}`);
+    if (!entry) return;
+    const at = Date.now() - (Number(seek[3]) / 50) * 1000;
+    entry.startedAt = at;
+    entry.pausedAt = Date.now();
   }
 
   private ensureTicker(): void {

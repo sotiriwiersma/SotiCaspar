@@ -4,7 +4,13 @@
   "productName": "SotiCaspar",
   "private": true,
   "type": "module",
-  "description": "SotiCaspar desktop client (Electron + Svelte)",
+  "description": "SotiCaspar - a variant of the CasparCG Client (AI-generated code, GPL-3.0-or-later)",
+  "license": "GPL-3.0-or-later",
+  "author": "Sotiri Wiersma (https://github.com/sotiriwiersma)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sotiriwiersma/SotiCaspar.git"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -12,7 +18,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && svelte-check --tsconfig ./tsconfig.web.json",
-    "test": "vitest run --root ../.."
+    "test": "vitest run --root ../..",
+    "dist": "node ../../scripts/third-party-notices.mjs && electron-vite build && electron-builder --win portable --publish never"
   },
   "dependencies": {
     "@cycjimmy/jsmpeg-player": "^7.0.0",
@@ -21,7 +28,8 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "electron": "^45.3.3",
+    "electron": "45.3.3",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.8"

@@ -25,7 +25,7 @@ const PANEL_SETTINGS = {
   'view.audioLevels': 'showAudioLevelsPanel',
   'view.preview': 'showPreviewPanel',
   'view.live': 'showLivePanel',
-  'view.duration': 'showDurationPanel'
+  'view.countdown': 'showCountdownBar'
 } as const;
 
 /** Executes a menu / shortcut command. */
@@ -51,7 +51,7 @@ export function runCommand(action: MenuAction): void {
     case 'view.audioLevels':
     case 'view.preview':
     case 'view.live':
-    case 'view.duration': {
+    case 'view.countdown': {
       const key = PANEL_SETTINGS[id];
       return void app.updateSettings({ [key]: !app.settings[key] });
     }

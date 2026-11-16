@@ -1,6 +1,7 @@
 <script lang="ts">
   import { MIME, toolCategories } from '../lib/definitions';
   import { workspace } from '../stores/workspace.svelte';
+  import ItemIcon from './ItemIcon.svelte';
 
   const categories = toolCategories();
   let collapsed = $state<Record<string, boolean>>({});
@@ -36,7 +37,7 @@
               onkeydown={(e) => e.key === 'Enter' && workspace.addTool(definition.type)}
               ondragstart={(e) => ondragstart(e, definition.type)}
             >
-              <span class="swatch" style:background={definition.color}></span>
+              <ItemIcon type={definition.type} color={definition.color} />
               {definition.title}
             </div>
           {/each}
@@ -67,7 +68,7 @@
   .tool {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     height: 22px;
     padding: 0 8px 0 22px;
   }
@@ -80,12 +81,5 @@
   .tool:focus-visible {
     outline: 1px solid var(--accent);
     outline-offset: -1px;
-  }
-
-  .swatch {
-    width: 10px;
-    height: 10px;
-    flex: none;
-    border: 1px solid var(--border);
   }
 </style>

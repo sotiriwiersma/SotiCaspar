@@ -62,7 +62,11 @@ export interface AppSettings {
   oscMonitorPort: number;
   oscControlPort: number;
   oscWebSocketPort: number;
-  delayType: 'Milliseconds' | 'Frames';
+  /**
+   * Unit of the Delay and Duration of a rundown item. `Frames` and `Timecode` store the same number (frames
+   * of the item's channel); `Timecode` only shows and edits it as `hh:mm:ss:ff`.
+   */
+  delayType: 'Milliseconds' | 'Frames' | 'Timecode';
   rundownRepository: string;
   repositoryPort: number;
   previewOnAutoStep: boolean;
@@ -70,7 +74,14 @@ export interface AppSettings {
   showAudioLevelsPanel: boolean;
   showPreviewPanel: boolean;
   showLivePanel: boolean;
-  showDurationPanel: boolean;
+  showCountdownBar: boolean;
+  /**
+   * What the countdown bar follows: the video that was started last (`latest`), the selected rundown row
+   * (`selected`, videos only) or a fixed layer (`layer`, see `countdownLayer`).
+   */
+  countdownSource: 'latest' | 'selected' | 'layer';
+  /** The layer of the `layer` source: `device|channel|layer`. */
+  countdownLayer: string;
   markUsedItems: boolean;
   useFreezeOnLoad: boolean;
   disableAudioInStream: boolean;
@@ -81,7 +92,14 @@ export interface AppSettings {
   useDropFrameNotation: boolean;
   /** Number of entries kept in the "open recent" list. */
   openRecent: number;
+  /**
+   * Properties that new clips start with, per item type (`MOVIE`, `STILL`, `AUDIO`, `TEMPLATE`). Only the
+   * properties that differ from the item's own defaults are stored.
+   */
+  clipDefaults: ClipDefaults;
 }
+
+export type ClipDefaults = Record<string, Record<string, string | number | boolean>>;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   fontSize: 12,
@@ -108,7 +126,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showAudioLevelsPanel: true,
   showPreviewPanel: true,
   showLivePanel: true,
-  showDurationPanel: false,
+  showCountdownBar: true,
+  countdownSource: 'latest',
+  countdownLayer: '',
   markUsedItems: false,
   useFreezeOnLoad: false,
   disableAudioInStream: true,
@@ -117,7 +137,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   streamPort: 9250,
   logLevel: -1,
   useDropFrameNotation: false,
-  openRecent: 10
+  openRecent: 10,
+  clipDefaults: {}
 };
 
 // ---------------------------------------------------------------- Library

@@ -11,6 +11,7 @@ import { systemClock } from '../engine/scheduler';
 import { patchProps } from '../engine/tree';
 import { app } from './app.svelte';
 import { duration } from './duration.svelte';
+import { itemLayers, layerStates } from './layerStates.svelte';
 import { rowOsc } from './osc.svelte';
 import { ui } from './ui.svelte';
 
@@ -42,6 +43,7 @@ class Workspace {
     devices: () => app.devices,
     settings: () => app.settings,
     clock: systemClock,
+    serverState: (item) => layerStates.stateOf(item),
     watchStart: (item, onStarted) => rowOsc.watchStart(item, onStarted),
     onDuration: (ms) => duration.start(ms),
     runRundownCommand: (type) => this.active.engine.trigger(type),
@@ -91,6 +93,25 @@ class Workspace {
   get hasContent(): boolean {
     this.revision;
     return this.active.model.nodes.length > 0;
+  }
+
+  /** The video that was started last in any rundown and still plays (what the countdown bar follows). */
+  latestPlayingVideo() {
+    this.runtimeRevision;
+    layerStates.revision;
+    let best: { item: NonNullable<ReturnType<RundownEngine['latestPlayingVideo']>>; at: number } | null = null;
+    for (const tab of this.tabs) {
+      const item = tab.engine.latestPlayingVideo();
+      const at = item ? tab.engine.runtime(item.id).flashAt : -1;
+      if (item && (!best || at >= best.at)) best = { item, at };
+    }
+    return best?.item ?? null;
+  }
+
+  /** The layers of every item in every open rundown: all of them are followed on the server. */
+  allItemLayers() {
+    this.revision;
+    return this.tabs.flatMap((tab) => itemLayers(tab.model.nodes));
   }
 
   isDirty(tab: Tab): boolean {

@@ -70,10 +70,20 @@ export function rowLabel(node: TreeNode): string {
   return node.label.split('/').pop() ?? node.label;
 }
 
-/** New video items follow the `Use freeze on load` setting (set when the Qt widget is created). */
-export function applyItemDefaults(item: RundownItem, settings: Pick<AppSettings, 'useFreezeOnLoad'>): RundownItem {
-  if (!settings.useFreezeOnLoad || LIBRARY_TYPE_OF_ITEM[item.type] !== 'MOVIE') return item;
-  return { ...item, props: { ...item.props, freezeonload: true } };
+/** The item types of the library clips that have default properties (Settings, New clips). */
+export const CLIP_TYPES: readonly string[] = ['MOVIE', 'STILL', 'AUDIO', 'TEMPLATE'];
+
+/**
+ * New items start with the defaults of the settings: video items follow `Use freeze on load` (set when the Qt
+ * widget is created), and every clip type with its own defaults (`clipDefaults`) takes those on top.
+ */
+export function applyItemDefaults(item: RundownItem, settings: Pick<AppSettings, 'useFreezeOnLoad' | 'clipDefaults'>): RundownItem {
+  const own = settings.clipDefaults[item.type];
+  const freeze = settings.useFreezeOnLoad && LIBRARY_TYPE_OF_ITEM[item.type] === 'MOVIE' ? { freezeonload: true } : undefined;
+  if (!own && !freeze) return item;
+  // The duration of the media is the item's own, never a default.
+  const { timecode: _timecode, ...defaults } = own ?? {};
+  return { ...item, props: { ...item.props, ...freeze, ...defaults } };
 }
 
 export function createToolItem(type: string): RundownItem | null {

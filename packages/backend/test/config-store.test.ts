@@ -37,6 +37,20 @@ describe('ConfigStore', () => {
     expect(settings).not.toHaveProperty('unknown');
   });
 
+  it('keeps the default properties of clips and drops what is not a plain value', async () => {
+    const dir = await makeDataDir();
+    await writeFile(
+      join(dir, 'settings.json'),
+      JSON.stringify({ clipDefaults: { MOVIE: { loop: true, channel: 2, nested: { a: 1 }, nothing: null, text: 'x' }, STILL: 'nope', AUDIO: {} }, delayType: 'Timecode' })
+    );
+
+    const settings = (await openStore(dir)).settings();
+
+    expect(settings.clipDefaults).toEqual({ MOVIE: { loop: true, channel: 2, text: 'x' } });
+    expect(settings.delayType).toBe('Timecode');
+    expect((await openStore(await makeDataDir())).settings().clipDefaults).toEqual({});
+  });
+
   it('persists settings, devices, outputs and presets across restarts', async () => {
     const dir = await makeDataDir();
     const store = await openStore(dir);

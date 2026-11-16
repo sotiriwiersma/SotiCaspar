@@ -11,7 +11,6 @@ describe('RundownEngine', () => {
       h.engine.trigger('Play');
       expect(h.sent).toHaveLength(1);
       expect(h.sent[0]).toMatch(/^A: PLAY 1-10 "CLIP"/);
-      expect(h.engine.runtime(clip.id)).toMatchObject({ playing: true, loaded: false, paused: false });
     });
 
     it('delays play and stops after the duration (milliseconds)', () => {
@@ -28,7 +27,6 @@ describe('RundownEngine', () => {
       h.clock.advance(1000);
       expect(h.sent).toHaveLength(2);
       expect(h.sent[1]).toBe('A: STOP 1-10');
-      expect(h.engine.runtime(clip.id).playing).toBe(false);
     });
 
     it('converts frames with the fps of the channel format', () => {
@@ -76,30 +74,49 @@ describe('RundownEngine', () => {
       expect(h.sent).toEqual(['A: STOP 1-10']);
     });
 
-    it('load then play uses the loaded media', () => {
+    it('plays the loaded clip only while the server reports it loaded', () => {
       const h = harness();
       const [clip] = fill(h, [movie('CLIP')]);
       h.model.select(clip.id, 'single');
       h.engine.trigger('Load');
       expect(h.sent[0]).toMatch(/^A: LOADBG 1-10 "CLIP"|^A: LOAD 1-10 "CLIP"/);
-      expect(h.engine.runtime(clip.id).loaded).toBe(true);
+      // The server has not reported it yet, or another program replaced it: play the clip by name.
       h.engine.trigger('PlayNow');
-      expect(h.sent[1]).toBe('A: PLAY 1-10');
-      expect(h.engine.runtime(clip.id)).toMatchObject({ loaded: false, playing: true });
+      expect(h.sent[1]).toMatch(/^A: PLAY 1-10 "CLIP"/);
+      // The server reports it loaded: a bare PLAY starts what is there.
+      h.server.set(clip.id, { loaded: true, playing: false, paused: false });
+      h.engine.trigger('PlayNow');
+      expect(h.sent[2]).toBe('A: PLAY 1-10');
     });
 
-    it('pause toggles only while playing', () => {
+    it('pauses and resumes as the server reports, also after another program changed it', () => {
       const h = harness();
       const [clip] = fill(h, [movie('CLIP')]);
       h.model.select(clip.id, 'single');
       h.engine.trigger('PauseResume');
-      expect(h.sent).toEqual([]);
-      h.engine.trigger('PlayNow');
+      expect(h.sent).toEqual([]); // not playing on the server
+      h.server.set(clip.id, { loaded: false, playing: true, paused: false });
+      h.engine.trigger('PauseResume');
+      expect(h.sent[0]).toBe('A: PAUSE 1-10');
+      // Not reported paused yet: pressing again pauses again, it never guesses a resume.
       h.engine.trigger('PauseResume');
       expect(h.sent[1]).toBe('A: PAUSE 1-10');
-      expect(h.engine.runtime(clip.id).paused).toBe(true);
+      // Paused by someone else: resume.
+      h.server.set(clip.id, { loaded: false, playing: true, paused: true });
       h.engine.trigger('PauseResume');
       expect(h.sent[2]).toBe('A: RESUME 1-10');
+    });
+
+    it('follows a video started by another program in the countdown', () => {
+      const h = harness();
+      const [a, b] = fill(h, [movie('A'), movie('B')]);
+      expect(h.engine.latestPlayingVideo()).toBeNull();
+      h.server.set(b.id, { loaded: false, playing: true, paused: false });
+      expect(h.engine.latestPlayingVideo()?.id).toBe(b.id);
+      // One triggered here wins over one started elsewhere.
+      h.engine.trigger('PlayNow', a.id);
+      h.server.set(a.id, { loaded: false, playing: true, paused: false });
+      expect(h.engine.latestPlayingVideo()?.id).toBe(a.id);
     });
 
     it('triggers on Next only for trigger-on-next items', () => {
@@ -212,7 +229,6 @@ describe('RundownEngine', () => {
       expect(h.sent).toEqual(['A: CG 2-20 ADD 1 "TPL" 1 "D"']);
       h.clock.advance(300);
       expect(h.sent[1]).toBe('A: CG 2-20 STOP 1');
-      expect(h.engine.runtime(tpl.id).playing).toBe(false);
     });
 
     it('ignores a template preview without a preview channel or with a negative delay', () => {
@@ -244,7 +260,6 @@ describe('RundownEngine', () => {
       h.sent.length = 0;
       h.engine.trigger('Clear', tpl.id);
       expect(h.sent).toEqual(['A: CG 1-20 REMOVE 1', 'A: CG 2-20 REMOVE 1']);
-      expect(h.engine.runtime(tpl.id).playing).toBe(false);
       h.sent.length = 0;
       h.engine.trigger('ClearVideoLayer', tpl.id);
       expect(h.sent).toEqual(['A: CLEAR 1-20', 'A: CLEAR 2-20']);
@@ -255,9 +270,9 @@ describe('RundownEngine', () => {
       const [tpl] = fill(h, [template()]);
       h.engine.trigger('PlayNow', tpl.id);
       h.sent.length = 0;
+      h.server.set(tpl.id, { loaded: false, playing: true, paused: false });
       h.engine.trigger('PauseResume', tpl.id);
       expect(h.sent).toEqual([]);
-      expect(h.engine.runtime(tpl.id).paused).toBe(false);
     });
 
     it('delays Load of a mixer like Play and ignores its pause', () => {

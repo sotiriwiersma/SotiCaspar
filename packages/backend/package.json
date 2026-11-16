@@ -14,5 +14,11 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.2"
+  },
+  "license": "GPL-3.0-or-later",
+  "author": "Sotiri Wiersma (https://github.com/sotiriwiersma)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sotiriwiersma/SotiCaspar.git"
   }
 }

@@ -40,7 +40,15 @@ describe(`rundown engine on live CasparCG at ${HOST}:${PORT}`, () => {
   const model = new RundownModel();
   let engine: RundownEngine;
 
-  const layerInfo = () => backend.sendCustomCommand(DEVICE, `INFO 1-${LAYER}`);
+  /** The last INFO of the layer: the live test reads the server state from it instead of OSC. */
+  let lastInfo = '';
+  const layerInfo = async () => (lastInfo = await backend.sendCustomCommand(DEVICE, `INFO 1-${LAYER}`));
+  const section = (name: string) => new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(lastInfo)?.[1] ?? '';
+  const serverState = () => {
+    const foreground = section('foreground');
+    const playing = /<producer>ffmpeg<\/producer>/.test(foreground);
+    return { playing, paused: playing && /<paused>true<\/paused>/.test(foreground), loaded: /<producer>ffmpeg<\/producer>/.test(section('background')) };
+  };
   const until = (what: string, pattern: RegExp, timeoutMs?: number) =>
     waitFor(what, async () => (pattern.test(await layerInfo()) ? true : undefined), timeoutMs);
   const noProducer = /^(?![\s\S]*<producer>ffmpeg<\/producer>)/;
@@ -79,6 +87,7 @@ describe(`rundown engine on live CasparCG at ${HOST}:${PORT}`, () => {
       devices: () => devices,
       settings: () => ({ ...DEFAULT_SETTINGS, delayType: 'Milliseconds' }),
       clock: { setTimeout: (run, ms) => setTimeout(run, ms), clearTimeout: (h) => clearTimeout(h as NodeJS.Timeout), now: () => Date.now() },
+      serverState,
       watchStart: () => () => undefined,
       onDuration: () => undefined,
       runRundownCommand: () => undefined,
@@ -102,7 +111,6 @@ describe(`rundown engine on live CasparCG at ${HOST}:${PORT}`, () => {
 
     engine.trigger('Play');
     await until('playing', /<producer>ffmpeg<\/producer>/);
-    expect(engine.runtime(clip.id).playing).toBe(true);
 
     engine.trigger('PauseResume');
     await until('paused', /<paused>true<\/paused>/);
@@ -111,7 +119,6 @@ describe(`rundown engine on live CasparCG at ${HOST}:${PORT}`, () => {
 
     engine.trigger('Stop');
     await until('stopped', noProducer);
-    expect(engine.runtime(clip.id).playing).toBe(false);
     expect(errors).toEqual([]);
   });
 

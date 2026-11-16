@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, createItem, type DeviceCommands, type DeviceConfig, type PlayoutType, type RundownItem } from '@soticaspar/core';
+import { DEFAULT_SETTINGS, IDLE_STATE, createItem, type DeviceCommands, type DeviceConfig, type ItemState, type PlayoutType, type RundownItem } from '@soticaspar/core';
 import { RundownEngine, type EngineEnv, type EngineSettings } from '../src/renderer/engine/engine';
 import { RundownModel } from '../src/renderer/engine/rundownModel';
 import type { Clock } from '../src/renderer/engine/scheduler';
@@ -67,6 +67,8 @@ export interface Harness {
   durations: number[];
   rundownCommands: PlayoutType[];
   watchers: Map<string, () => void>;
+  /** What the server reports per item id (idle when absent): set it to act as another program or the OSC feed. */
+  server: Map<string, ItemState>;
   settings: EngineSettings;
   devices: DeviceConfig[];
 }
@@ -79,6 +81,7 @@ export function harness(options: { devices?: DeviceConfig[]; settings?: Partial<
   const durations: number[] = [];
   const rundownCommands: PlayoutType[] = [];
   const watchers = new Map<string, () => void>();
+  const server = new Map<string, ItemState>();
   const settings: EngineSettings = {
     delayType: 'Milliseconds',
     markUsedItems: false,
@@ -109,6 +112,7 @@ export function harness(options: { devices?: DeviceConfig[]; settings?: Partial<
     devices: () => devices,
     settings: () => ({ ...DEFAULT_SETTINGS, ...settings }),
     clock,
+    serverState: (item) => server.get(item.id) ?? IDLE_STATE,
     watchStart: (item, onStarted) => {
       watchers.set(item.id, onStarted);
       return () => watchers.delete(item.id);
@@ -122,7 +126,7 @@ export function harness(options: { devices?: DeviceConfig[]; settings?: Partial<
     onChange: () => undefined
   };
 
-  return { model, engine: new RundownEngine(model, env), clock, sent, batches, effects, durations, rundownCommands, watchers, settings, devices };
+  return { model, engine: new RundownEngine(model, env), clock, sent, batches, effects, durations, rundownCommands, watchers, server, settings, devices };
 }
 
 export const movie = (name: string, props: Record<string, string | number | boolean> = {}, deviceName = 'A'): RundownItem =>

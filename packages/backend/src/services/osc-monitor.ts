@@ -4,7 +4,11 @@ import { noopLog, type LogFn } from './log';
 import { MessageBatcher } from './message-batcher';
 import { OscUdpReceiver } from './osc-udp-receiver';
 
-const BATCH_INTERVAL_MS = 200;
+/**
+ * Short enough to pass on every frame (the server sends one bundle per frame: 20 ms at 50 fps, 16.7 ms at 60 fps),
+ * long enough to merge repeats within a burst. It was 200 ms, which showed the time only every 10 frames at 50 fps.
+ */
+const BATCH_INTERVAL_MS = 10;
 
 interface MonitorEvent {
   sourceAddress: string;
@@ -13,7 +17,7 @@ interface MonitorEvent {
 
 /**
  * Receives the OSC stream of a CasparCG server. Only the newest message per source and path is delivered,
- * at most once every 200 ms. `/control` messages belong to the control server and are ignored.
+ * at most once every 10 ms. `/control` messages belong to the control server and are ignored.
  */
 export class OscMonitor {
   private readonly receiver: OscUdpReceiver;

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { DEFAULT_SETTINGS } from '@soticaspar/core';
-import type { AppSettings, DeviceConfig, OscOutputConfig, Preset } from '@soticaspar/core';
+import type { AppSettings, ClipDefaults, DeviceConfig, OscOutputConfig, Preset } from '@soticaspar/core';
 import type { LogFn } from './events';
 import { JsonFile } from './json-file';
 
@@ -67,7 +67,24 @@ function removeNamed<T extends { name: string }>(list: T[], name: string): boole
   return true;
 }
 
-export const sanitizeSettings = (raw: unknown): AppSettings => pickKnown(raw, DEFAULT_SETTINGS);
+/** Per item type a flat record of strings, numbers and booleans; anything else is dropped. */
+function sanitizeClipDefaults(raw: unknown): ClipDefaults {
+  const result: ClipDefaults = {};
+  if (!isRecord(raw)) return result;
+  for (const [type, props] of Object.entries(raw)) {
+    if (!isRecord(props)) continue;
+    const kept = Object.fromEntries(
+      Object.entries(props).filter(([, value]) => typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value)))
+    ) as ClipDefaults[string];
+    if (Object.keys(kept).length > 0) result[type] = kept;
+  }
+  return result;
+}
+
+export const sanitizeSettings = (raw: unknown): AppSettings => ({
+  ...pickKnown(raw, DEFAULT_SETTINGS),
+  clipDefaults: sanitizeClipDefaults(isRecord(raw) ? raw.clipDefaults : undefined)
+});
 
 /** Persists the application configuration as JSON files in a data directory. */
 export class ConfigStore {

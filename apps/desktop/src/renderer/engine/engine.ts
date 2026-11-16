@@ -2,9 +2,7 @@ import {
   buildCommands,
   buildEffects,
   getItemDefinition,
-  nextState,
   resolveTrigger,
-  IDLE_STATE,
   SCHEDULED_END,
   STOPPING_OPS,
   type AnyItemDefinition,
@@ -23,14 +21,25 @@ import type { RundownModel } from './rundownModel';
 import { Scheduler, type Clock, type Step } from './scheduler';
 import { isGroupNode, locate, type TreeGroup, type TreeItem, type TreeNode } from './tree';
 
-export interface ItemRuntime extends ItemState {
+/** Colour of the "executed" flash of a row: green for play, red for stop and clear, blue for everything else. */
+export type FlashKind = 'play' | 'stop' | 'other';
+
+/**
+ * What the app remembers about an item. Not its playout state: whether an item is playing, paused or loaded is
+ * always asked of the server (`EngineEnv.serverState`), so changes by other programs are respected.
+ */
+export interface ItemRuntime {
   /** Marked as used (dimmed row). */
   used: boolean;
   /** Incremented on every trigger, restarts the "executed" flash of the row. */
   flash: number;
+  /** What the last trigger did, which picks the colour of the flash. */
+  flashKind: FlashKind;
+  /** When the last trigger happened (ms). A row that is created later (moved, scrolled into view) does not flash. */
+  flashAt: number;
 }
 
-const IDLE: Readonly<ItemRuntime> = { ...IDLE_STATE, used: false, flash: 0 };
+const IDLE: Readonly<ItemRuntime> = { used: false, flash: 0, flashKind: 'other', flashAt: 0 };
 
 export type EngineSettings = Pick<AppSettings, 'delayType' | 'markUsedItems' | 'previewOnAutoStep' | 'clearDelayedCommandsOnAutoStep'>;
 
@@ -39,6 +48,8 @@ export interface EngineEnv {
   devices(): readonly DeviceConfig[];
   settings(): EngineSettings;
   clock: Clock;
+  /** Whether the item is loaded, playing or paused, as its layer on the server reports it (OSC). */
+  serverState(item: TreeItem): ItemState;
   /** Notifies when an item's media has started on the server (OSC); returns the unsubscribe. */
   watchStart(item: TreeItem, onStarted: () => void): () => void;
   /** Group durations feed the duration panel (0 resets it). */
@@ -54,6 +65,8 @@ export interface EngineEnv {
 const flag = (props: TreeNode['props'], key: string): boolean => props[key] === true || props[key] === 'true';
 const base = (item: TreeItem): BaseProps => item.props as unknown as BaseProps;
 const isClear = (type: PlayoutType): boolean => type === 'Clear' || type === 'ClearVideoLayer' || type === 'ClearChannel';
+const flashKindOf = (type: PlayoutType): FlashKind =>
+  type === 'Play' || type === 'PlayNow' ? 'play' : type === 'Stop' || isClear(type) ? 'stop' : 'other';
 
 type TimerKind = 'item' | 'update' | 'preview';
 
@@ -115,6 +128,31 @@ export class RundownEngine {
     return id === this.model.current || id === this.playingId || id === this.autoStepId;
   }
 
+  /**
+   * The video that plays on the server and was triggered here last: what the countdown bar follows. A video another
+   * program started counts too, after the ones triggered here.
+   */
+  latestPlayingVideo(): TreeItem | null {
+    let best: TreeItem | null = null;
+    let bestAt = -Infinity;
+    const visit = (nodes: readonly TreeNode[]): void => {
+      for (const node of nodes) {
+        if (isGroupNode(node)) {
+          visit(node.items);
+          continue;
+        }
+        if (getItemDefinition(node.type)?.timeline !== true) continue;
+        const at = this.runtime(node.id).flashAt;
+        if (at > bestAt && this.env.serverState(node).playing) {
+          best = node;
+          bestAt = at;
+        }
+      }
+    };
+    visit(this.model.nodes);
+    return best;
+  }
+
   /** Runs `type` on `itemId` (default: the current node) with the full group / auto-step semantics. */
   trigger(type: PlayoutType, itemId: string | null = this.model.current): void {
     if (itemId === null) return;
@@ -164,7 +202,6 @@ export class RundownEngine {
     if (!group || !isGroupNode(group)) return;
     for (const child of group.items) {
       this.cancelTimers(child.id);
-      this.patch(child.id, { ...IDLE_STATE });
     }
   }
 
@@ -281,9 +318,9 @@ export class RundownEngine {
     }
     const definition = this.definitionOf(node);
     if (!definition) return;
-    this.patch(node.id, { flash: this.runtime(node.id).flash + 1 });
+    this.flash(node.id, type);
 
-    const resolution = resolveTrigger(definition, node, type, this.runtime(node.id));
+    const resolution = resolveTrigger(definition, node, type, this.env.serverState(node));
     if (resolution.op === null) return;
     if (resolution.scheduled) this.schedule(node, definition, resolution.op);
     else this.perform(node, definition, resolution.op);
@@ -291,7 +328,7 @@ export class RundownEngine {
 
   /** The group row itself only drives the duration panel and the used mark. */
   private executeGroupSelf(group: TreeGroup, type: PlayoutType): void {
-    this.patch(group.id, { flash: this.runtime(group.id).flash + 1 });
+    this.flash(group.id, type);
     const duration = Number(group.props.duration ?? 0);
     if (type === 'Play' || type === 'PlayNow') {
       if (duration > 0) this.env.onDuration(duration);
@@ -339,7 +376,8 @@ export class RundownEngine {
   }
 
   private perform(item: TreeItem, definition: AnyItemDefinition, op: PlayoutOp): void {
-    const state = this.runtime(item.id);
+    // Decided by what the server reports right now (another program may have changed the layer).
+    const state = this.env.serverState(item);
     const { main, shadows } = resolveTargets(this.env.devices(), item.deviceName);
 
     const batches = buildCommands(definition, item, op, state, { main, shadows });
@@ -353,9 +391,7 @@ export class RundownEngine {
       this.cancelTimers(item.id);
       this.stopWatching(item.id);
     }
-    const after = nextState(state, op);
-    const used = state.used || (op === 'play' && this.env.settings().markUsedItems);
-    this.patch(item.id, { ...after, used });
+    if (op === 'play' && this.env.settings().markUsedItems) this.patch(item.id, { used: true });
     if ((op === 'play' || op === 'next') && definition.autoPlay?.(item.props)) this.watchStart(item);
   }
 
@@ -409,6 +445,10 @@ export class RundownEngine {
 
   private definitionOf(item: TreeItem): AnyItemDefinition | undefined {
     return getItemDefinition(item.type);
+  }
+
+  private flash(id: string, type: PlayoutType): void {
+    this.patch(id, { flash: this.runtime(id).flash + 1, flashKind: flashKindOf(type), flashAt: this.env.clock.now() });
   }
 
   private patch(id: string, change: Partial<ItemRuntime>): void {

@@ -1,8 +1,29 @@
 # SotiCaspar
 
-A rewrite of the [CasparCG Client](https://github.com/CasparCG/client) (Qt/C++) as an Electron desktop app in
-TypeScript and Svelte. It behaves like the Qt client and reads and writes the same rundown files, but is easier to
-change and stays fast with large rundowns.
+**A variant of the [CasparCG Client](https://github.com/CasparCG/client)**, rewritten from Qt/C++ as an Electron desktop
+app in TypeScript and Svelte. It behaves like the original client and reads and writes the same rundown files, and adds
+features of its own (see [Differences](#differences-from-the-qt-client)).
+
+> **AI-generated code.** The code in this repository was generated with AI (Anthropic's Claude, through Claude Code),
+> directed by and with input from [Sotiri Wiersma](https://github.com/sotiriwiersma): what to build, how it should work
+> and look, and testing against a real CasparCG server. It has not been reviewed line by line by a human. Use it at
+> your own risk.
+
+SotiCaspar is not made, endorsed or supported by the CasparCG project or Sveriges Television AB.
+
+## Download
+
+Windows: download `SotiCaspar-<version>-portable.exe` from the
+[Releases](https://github.com/sotiriwiersma/SotiCaspar/releases) page. It needs no installation: start it from
+anywhere. Settings are kept in `%APPDATA%\SotiCaspar`. Requires CasparCG Server 2.3 or newer (tested with 2.5).
+
+## License
+
+SotiCaspar is a modified version of the CasparCG Client and, like the original, is free software under the
+**GNU General Public License v3.0 or later**: see [LICENSE](LICENSE). Copyright of the original belongs to the CasparCG
+Client authors and contributors; the modifications are © 2026 Sotiri Wiersma. [NOTICE.md](NOTICE.md) describes the
+origin and the changes, and [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) holds the licenses of the included
+third-party software. This program comes with ABSOLUTELY NO WARRANTY.
 
 ## Layout
 
@@ -20,6 +41,7 @@ npm run dev          # Electron app against real servers
 npm run build        # production build (apps/desktop/out)
 npm test             # unit tests
 npm run typecheck    # TypeScript (core + backend); `npm run typecheck -w @soticaspar/desktop` for the app
+npm run dist         # Windows portable exe in apps/desktop/release (also regenerates THIRD_PARTY_NOTICES.txt)
 ```
 
 - `SOTICASPAR_MOCK=1 npm run dev` runs the app against an in-memory mock backend.
@@ -55,6 +77,33 @@ rundown rows and the engine all pick it up from the registry.
 - **Live panel.** The server streams MPEG-1 video and MP2 audio in MPEG-TS instead of H.264. The backend relays it to
   the window over a local WebSocket, and JSMpeg decodes it there, so libvlc is not needed. The panel shows 288×162 and
   the live window 960×540. There is no audio track menu.
+- **Playout state comes from the server.** Whether an item is loaded, playing or paused is read from the OSC of its
+  layer, never remembered from the commands the app sent, so Companion or other programs can drive the server too.
+  Play after Load sends a bare `PLAY` only while the server reports that clip loaded; Pause sends `RESUME` only
+  while it reports the layer paused. Items without a clip of their own (templates, colours, routes, inputs) cannot
+  be recognised on their layer: they show no state, and Play always sends their full command.
+- **Step buttons.** Next to F1–F12, ±1 minute, second and frame move the selected row's video while it is in the
+  foreground of its layer (playing or paused): `CALL … SEEK rel`, in channel frames. A frame step is one picture of the
+  clip (2 channel frames for 25p on a 50p channel). A step past either end goes to the first or last frame. CasparCG
+  2.5 ignores seeks into the last second of some files (seen with VP9 WebM), so a step there can do nothing.
+- **Leftover live streams.** A stream the app could not remove (crash, forced quit) is removed when the server
+  connects, and before each new Live stream on that channel. Only streams to this PC's stream port are touched.
+- **Companion Button.** An output item (Tools › Output) that presses, holds or releases a button in Bitfocus Companion
+  through its HTTP remote control: `POST http://<host>:<port>/api/location/<page>/<row>/<column>/press` (or `down` /
+  `up`). Pages count from 1, rows and columns from 0. Turn on *HTTP API* in Companion's settings. Companion's default
+  port is 8000, which on a CasparCG machine is usually taken by the media scanner: give Companion another port there.
+  Like the HTTP items, only a failed connection is reported, not an error answer from Companion.
+- **Countdown bar.** The bar at the top follows (▾ menu) the video that was started last, the selected row or a fixed
+  channel-layer: played, remaining and total time
+  as `hh:mm:ss:ff`, and a position bar to click or drag to jump to a point (`CALL … SEEK`). It needs the OSC
+  monitor, so it only works for the one program that receives the server's OSC on the monitor port: close the Qt
+  client while testing. Following the video started last, it shows a playing group's duration countdown when no video plays.
+- **Delay and duration as timecode.** Settings › Delay and duration also offers `hh:mm:ss:ff`. The value stays a
+  frame count of the item's channel (the same as the *Frames* setting); only its display and input change. 29.97
+  and 59.94 use the nominal 30 / 60 timecode, drop frame notation uses real drop frame counting.
+- **Default properties of new clips.** Settings › New clips sets what a Video, Image, Audio or Template starts with
+  when added to a rundown.
+- **Tool icons.** The Tools tree uses SVG icons drawn after the 16x16 icons of the Qt client (`lib/icons.ts`).
 - **Frame rate over OSC.** The frame rate is read as the ratio CasparCG 2.2+ sends (`30000/1001`). Qt only used the
   first number.
 - **Repository port.** The rundown repository connection uses the *Repository port* setting. Qt always used 8250,

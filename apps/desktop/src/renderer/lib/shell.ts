@@ -47,7 +47,8 @@ const browserShell: ShellApi = {
   toggleFullscreen: () => {
     if (document.fullscreenElement) void document.exitFullscreen();
     else void document.documentElement.requestFullscreen();
-  }
+  },
+  openLink: (url) => void window.open(url, '_blank', 'noopener')
 };
 
 export const shell: ShellApi = (typeof window !== 'undefined' && window.shell) || browserShell;

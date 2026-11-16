@@ -5,12 +5,13 @@
   import { app } from './stores/app.svelte';
   import { menuState, runCommand } from './stores/commands';
   import { ui } from './stores/ui.svelte';
+  import { layerStates } from './stores/layerStates.svelte';
   import { workspace } from './stores/workspace.svelte';
   import AboutDialog from './components/AboutDialog.svelte';
   import AppMenuBar from './components/AppMenuBar.svelte';
   import AudioLevelsPanel from './components/AudioLevelsPanel.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
-  import DurationPanel from './components/DurationPanel.svelte';
+  import CountdownBar from './components/CountdownBar.svelte';
   import HelpDialog from './components/HelpDialog.svelte';
   import InspectorPanel from './components/InspectorPanel.svelte';
   import LibraryPanel from './components/LibraryPanel.svelte';
@@ -47,15 +48,20 @@
     localStorage.setItem(WIDTHS_KEY, JSON.stringify({ left: leftWidth, right: rightWidth }));
   });
 
-  $effect(() => {
-    const model = workspace.active.model;
+  const title = $derived.by(() => {
     workspace.revision;
-    shell.setTitle(model.path ? `SotiCaspar - ${model.path}` : 'SotiCaspar');
+    const path = workspace.active.model.path;
+    return path ? `SotiCaspar - ${path}` : 'SotiCaspar';
   });
+  // A derived value only changes when the text does, so the title is not sent again on every edit.
+  $effect(() => shell.setTitle(title));
 
   $effect(() => {
     shell.setMenuState(menuState());
   });
+
+  // The playout state of every item comes from the server: follow the layers of all open rundowns.
+  $effect(() => layerStates.watch('rundowns', workspace.allItemLayers()));
 
   onMount(() => {
     void app.init().catch((error) => ui.notify(`Could not reach the backend: ${String(error)}`, true));
@@ -82,6 +88,7 @@
 
 <div class="app">
   {#if !hasNativeShell}<AppMenuBar />{/if}
+  {#if s.showCountdownBar}<CountdownBar />{/if}
 
   <div class="main" style:grid-template-columns="{leftWidth}px 4px minmax(320px, 1fr) 4px {rightWidth}px">
     <aside class="column">
@@ -90,7 +97,6 @@
     </aside>
     <Splitter size={leftWidth} direction={1} label="Resize library" onresize={(v) => (leftWidth = v)} />
     <main class="column">
-      {#if s.showDurationPanel}<DurationPanel />{/if}
       <div class="grow"><RundownPanel /></div>
     </main>
     <Splitter size={rightWidth} direction={-1} label="Resize inspector" onresize={(v) => (rightWidth = v)} />

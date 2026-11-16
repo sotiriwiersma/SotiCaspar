@@ -18,6 +18,9 @@
   let openChild = $state<number | null>(null);
   let left = $state(0);
   let top = $state(0);
+  /** A submenu that would leave the window opens on the other side of its parent, or higher up. */
+  let flipX = $state(false);
+  let shiftY = $state(0);
 
   $effect(() => {
     left = x;
@@ -25,7 +28,14 @@
   });
 
   onMount(async () => {
-    if (nested) return;
+    if (nested) {
+      await tick();
+      if (!menu) return;
+      const rect = menu.getBoundingClientRect();
+      flipX = rect.right > window.innerWidth - 2;
+      shiftY = Math.min(0, window.innerHeight - 2 - rect.bottom);
+      return;
+    }
     await tick();
     if (!menu) return;
     const rect = menu.getBoundingClientRect();
@@ -34,8 +44,13 @@
     menu.querySelector<HTMLElement>('[role=menuitem]:not(:disabled)')?.focus();
   });
 
-  function choose(item: MenuItem): void {
-    if (item.disabled || item.children) return;
+  function choose(item: MenuItem, index: number): void {
+    // A click opens a submenu like hovering does (touch, pen and keyboard have no hover).
+    if (item.children) {
+      if (!item.disabled) openChild = index;
+      return;
+    }
+    if (item.disabled) return;
     onclose();
     item.onselect?.();
   }
@@ -57,7 +72,18 @@
 
 <svelte:window onpointerdown={(e) => !nested && !menu?.contains(e.target as Node) && onclose()} onblur={() => !nested && onclose()} />
 
-<div class="menu" class:nested role="menu" tabindex="-1" bind:this={menu} style:left={nested ? undefined : `${left}px`} style:top={nested ? undefined : `${top}px`} {onkeydown}>
+<div
+  class="menu"
+  class:nested
+  class:flip={flipX}
+  role="menu"
+  tabindex="-1"
+  bind:this={menu}
+  style:left={nested ? undefined : `${left}px`}
+  style:top={nested ? undefined : `${top}px`}
+  style:margin-top={nested && shiftY !== 0 ? `${shiftY}px` : undefined}
+  {onkeydown}
+>
   {#each items as item, index}
     {#if item.separator}
       <hr />
@@ -67,7 +93,7 @@
           type="button"
           role="menuitem"
           disabled={item.disabled}
-          onclick={() => choose(item)}
+          onclick={() => choose(item, index)}
           onpointerenter={() => (openChild = item.children && !item.disabled ? index : null)}
           onkeydown={(e) => {
             if (item.children && e.key === 'ArrowRight') {
@@ -105,6 +131,11 @@
     position: absolute;
     left: 100%;
     top: -4px;
+  }
+
+  .menu.nested.flip {
+    left: auto;
+    right: 100%;
   }
 
   .entry {

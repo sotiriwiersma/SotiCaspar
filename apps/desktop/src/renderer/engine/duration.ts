@@ -7,6 +7,9 @@ export interface CountdownView {
   total: string;
   /** 0..1 of the countdown still left. */
   fraction: number;
+  /** Milliseconds left and in total. */
+  remainingMs: number;
+  totalMs: number;
   running: boolean;
 }
 
@@ -14,6 +17,8 @@ export const idleCountdown = (dropFrame: boolean): CountdownView => ({
   remaining: zeroTimecode(dropFrame),
   total: zeroTimecode(dropFrame),
   fraction: 0,
+  remainingMs: 0,
+  totalMs: 0,
   running: false
 });
 
@@ -25,6 +30,8 @@ export function countdownView(durationMs: number, startedAt: number, now: number
     remaining: fromMilliseconds(durationMs - elapsed, dropFrame),
     total: fromMilliseconds(durationMs, dropFrame),
     fraction: (durationMs - elapsed) / durationMs,
+    remainingMs: durationMs - elapsed,
+    totalMs: durationMs,
     running: true
   };
 }

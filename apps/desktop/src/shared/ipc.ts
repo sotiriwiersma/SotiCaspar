@@ -67,7 +67,8 @@ export const channels = {
   fetchText: 'shell:fetch-text',
   setTitle: 'shell:set-title',
   toggleFullscreen: 'shell:toggle-fullscreen',
-  appInfo: 'shell:app-info'
+  appInfo: 'shell:app-info',
+  openLink: 'shell:open-link'
 } as const;
 
 export interface BackendEventEnvelope {

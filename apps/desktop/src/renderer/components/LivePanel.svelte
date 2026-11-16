@@ -5,18 +5,32 @@
   import { SEPARATOR, type MenuItem } from '../lib/menu';
   import { app } from '../stores/app.svelte';
   import ContextMenu from './ContextMenu.svelte';
+  import LiveInfoDialog from './LiveInfoDialog.svelte';
   import Modal from './Modal.svelte';
 
   /** Port of LiveWidget: a channel streamed by the server, in the panel or in a larger window. */
   type Target = { deviceName: string; channel: number; key: boolean };
 
-  let target = $state.raw<Target | null>(null);
+  const TARGET_KEY = 'soticaspar.live-target';
+
+  /** The channel that was shown last time, so the panel is back after a restart. */
+  function remembered(): Target | null {
+    try {
+      const value = JSON.parse(localStorage.getItem(TARGET_KEY) ?? 'null') as Partial<Target> | null;
+      return value && typeof value.deviceName === 'string' && Number.isInteger(value.channel) && typeof value.key === 'boolean' ? (value as Target) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  let target = $state.raw<Target | null>(remembered());
   let windowMode = $state(false);
   let collapsed = $state(false);
   let muted = $state(false);
   let status = $state<'idle' | 'connecting' | 'live' | 'error'>('idle');
   let error = $state('');
   let menu = $state<{ x: number; y: number } | null>(null);
+  let info = $state(false);
   let panelCanvas: HTMLCanvasElement | undefined = $state();
   let windowCanvas: HTMLCanvasElement | undefined = $state();
   let player = $state.raw<Player | null>(null);
@@ -29,6 +43,11 @@
     const large = windowMode;
     const canvas = large ? windowCanvas : panelCanvas;
     if (!current || !canvas) return;
+    // Wait for the server (also right after a start): the stream starts by itself once it is connected.
+    if (!app.isConnected(current.deviceName)) {
+      status = 'idle';
+      return;
+    }
 
     let cancelled = false;
     let instance: Player | null = null;
@@ -66,14 +85,28 @@
     if (player) player.volume = muted ? 0 : 1;
   });
 
+  function remember(next: Target | null): void {
+    try {
+      if (next) localStorage.setItem(TARGET_KEY, JSON.stringify(next));
+      else localStorage.removeItem(TARGET_KEY);
+    } catch {
+      // the panel works without remembering
+    }
+  }
+
   function connect(next: Target): void {
     target = next;
+    remember(next);
   }
 
   function disconnect(): void {
     target = null;
     status = 'idle';
+    remember(null);
   }
+
+  /** Fill of every channel of every server, for the buttons of the empty panel. */
+  const channels = $derived(app.devices.flatMap((device) => Array.from({ length: device.channels }, (_, i) => ({ deviceName: device.name, channel: i + 1 }))));
 
   const label = $derived(target ? `${target.deviceName}, channel ${target.channel} (${target.key ? 'Key' : 'Fill'})` : '');
 
@@ -95,7 +128,9 @@
       SEPARATOR,
       { label: 'Window Mode', checked: windowMode, onselect: () => (windowMode = !windowMode) },
       SEPARATOR,
-      { label: collapsed ? 'Expand' : 'Collapse', onselect: () => (collapsed = !collapsed) }
+      { label: collapsed ? 'Expand' : 'Collapse', onselect: () => (collapsed = !collapsed) },
+      SEPARATOR,
+      { label: 'ⓘ What the live stream needs…', onselect: () => (info = true) }
     ];
   });
 
@@ -107,7 +142,23 @@
 
 {#snippet overlay()}
   {#if !target}
-    <p class="message muted">Not connected. Use ▾ › Connect to.</p>
+    <div class="message">
+      {#if channels.length === 0}
+        <p class="muted">No server with channels yet. Add one in Settings › Devices.</p>
+      {:else}
+        <p class="muted">Show a channel of your server:</p>
+        <div class="choices">
+          {#each channels.slice(0, 6) as choice (`${choice.deviceName}|${choice.channel}`)}
+            <button type="button" disabled={!app.isConnected(choice.deviceName)} onclick={() => connect({ ...choice, key: false })}>
+              {choice.deviceName} · channel {choice.channel}
+            </button>
+          {/each}
+        </div>
+        <p class="muted small">Key, window mode and more: ▾ menu. Not working? ▾ › What the live stream needs.</p>
+      {/if}
+    </div>
+  {:else if !app.isConnected(target.deviceName)}
+    <p class="message muted">Waiting for {target.deviceName}…</p>
   {:else if status === 'connecting'}
     <p class="message muted">Connecting to {label}…</p>
   {:else if status === 'error'}
@@ -139,6 +190,10 @@
       {@render overlay()}
     </div>
   </Modal>
+{/if}
+
+{#if info}
+  <LiveInfoDialog onclose={() => (info = false)} />
 {/if}
 
 {#if menu}
@@ -187,6 +242,21 @@
     margin: 0;
     padding: 0 12px;
     text-align: center;
+  }
+
+  .message p {
+    margin: 4px 0;
+  }
+
+  .choices {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .small {
+    font-size: 0.85em;
   }
 
   .error {

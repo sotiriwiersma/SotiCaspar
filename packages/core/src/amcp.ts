@@ -187,6 +187,16 @@ export const startWebStream = (channel: number, port: number, key: boolean, prof
   `ADD ${channel} STREAM udp://<client_ip_address>:${port} -format mpegts -codec:v mpeg1video -b:v ${profile.videoKbps}k -bf:v 0 ` +
   `-filter:v ${key ? 'alphaextract,' : ''}scale=${profile.width}:${profile.height} -codec:a mp2 -b:a 128k -filter:a "pan=stereo|c0=FL|c1=FR"`;
 
+/**
+ * Jumps the video on a layer to `frame`, counted from the start of the file in frames of the *channel* (checked on
+ * CasparCG 2.5: `SEEK 125` on a 50 fps channel lands at 2.5 s of a 25 fps clip). The IN point does not move the
+ * frame numbers.
+ */
+export const seekMovie = (channel: number, layer: number, frame: number) => line('CALL', target(channel, layer), 'SEEK', Math.max(0, Math.round(frame)));
+
+/** Moves the video on a layer by `frames` (channel frames, may be negative) from where it is, paused or playing. */
+export const seekRelative = (channel: number, layer: number, frames: number) => line('CALL', target(channel, layer), 'SEEK', 'rel', Math.round(frames));
+
 // ---------------------------------------------------------------- Mixer
 
 const mixer = (channel: number, layer: number, verb: string, ...rest: Part[]) =>

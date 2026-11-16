@@ -3,7 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A modern, maintainable rewrite of the CasparCG Client",
+  "description": "A variant of the CasparCG Client, rewritten in TypeScript, Svelte and Electron with AI-generated code",
+  "license": "GPL-3.0-or-later",
+  "author": "Sotiri Wiersma (https://github.com/sotiriwiersma)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sotiriwiersma/SotiCaspar.git"
+  },
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -13,7 +19,9 @@
     "test:live": "vitest run --config vitest.live.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev": "npm run dev -w @soticaspar/desktop",
-    "build": "npm run build -w @soticaspar/desktop"
+    "build": "npm run build -w @soticaspar/desktop",
+    "dist": "npm run dist -w @soticaspar/desktop",
+    "notices": "node scripts/third-party-notices.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

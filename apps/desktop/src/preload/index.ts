@@ -54,7 +54,8 @@ const shell: ShellApi = {
   saveFile: (path, content, options) => ipcRenderer.invoke(channels.saveFile, path, content, options),
   fetchText: (url) => ipcRenderer.invoke(channels.fetchText, url),
   setTitle: (title) => ipcRenderer.send(channels.setTitle, title),
-  toggleFullscreen: () => ipcRenderer.send(channels.toggleFullscreen)
+  toggleFullscreen: () => ipcRenderer.send(channels.toggleFullscreen),
+  openLink: (url) => ipcRenderer.send(channels.openLink, url)
 };
 
 contextBridge.exposeInMainWorld('backend', backend);

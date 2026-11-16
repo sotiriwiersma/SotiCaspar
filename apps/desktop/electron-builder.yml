@@ -1,0 +1,29 @@
+# Windows portable build: `npm run dist` (from the repository root) writes release/SotiCaspar-<version>-portable.exe.
+appId: com.github.sotiriwiersma.soticaspar
+productName: SotiCaspar
+copyright: "Copyright © the CasparCG Client authors and contributors; modifications © 2026 Sotiri Wiersma. GPL-3.0-or-later."
+directories:
+  output: release
+  buildResources: build
+# Everything the app needs is bundled into out/ by electron-vite, so no node_modules are packed.
+files:
+  - out/**/*
+  - package.json
+  - "!node_modules/**/*"
+npmRebuild: false
+# The GPL text, the notice (origin, AI-generated, modifications) and the third-party licenses travel with the program.
+extraResources:
+  - from: ../../LICENSE
+    to: LICENSE
+  - from: ../../NOTICE.md
+    to: NOTICE.md
+  - from: ../../THIRD_PARTY_NOTICES.txt
+    to: THIRD_PARTY_NOTICES.txt
+win:
+  target:
+    - target: portable
+      arch: [x64]
+  icon: build/icon.ico
+  legalTrademarks: "Not affiliated with the CasparCG project or Sveriges Television AB."
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}

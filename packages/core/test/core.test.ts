@@ -43,6 +43,14 @@ describe('AMCP builders', () => {
     expect(amcp.loadMovie(1, 10, 'AMB', 'CUT', 0, 'Linear', 'RIGHT', 0, 0, false, true, false)).toBe('LOAD 1-10 "AMB" CUT 0 Linear RIGHT');
   });
 
+  it('seeks a layer to a frame', () => {
+    expect(amcp.seekMovie(1, 10, 625)).toBe('CALL 1-10 SEEK 625');
+    expect(amcp.seekMovie(2, 5, 12.6)).toBe('CALL 2-5 SEEK 13');
+    expect(amcp.seekMovie(1, 10, -4)).toBe('CALL 1-10 SEEK 0');
+    expect(amcp.seekRelative(1, 10, 2)).toBe('CALL 1-10 SEEK rel 2');
+    expect(amcp.seekRelative(1, 10, -50)).toBe('CALL 1-10 SEEK rel -50');
+  });
+
   it('plays with AUTO by loading in the background', () => {
     expect(amcp.playMovie(1, 10, 'AMB', 'CUT', 0, 'Linear', 'RIGHT', 0, 0, false, true)).toBe('LOADBG 1-10 "AMB" CUT 0 Linear RIGHT AUTO');
   });

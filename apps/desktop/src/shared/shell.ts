@@ -34,6 +34,13 @@ export interface PickOptions {
   filters?: FileFilter[];
 }
 
+/** The only addresses `openLink` opens: the source code, the original client and the license. */
+export const OPEN_LINKS = [
+  'https://github.com/sotiriwiersma/SotiCaspar',
+  'https://github.com/CasparCG/client',
+  'https://www.gnu.org/licenses/gpl-3.0.html'
+] as const;
+
 export interface ShellApi {
   appInfo(): Promise<AppInfo>;
   onMenuAction(listener: (action: MenuAction) => void): () => void;
@@ -48,6 +55,8 @@ export interface ShellApi {
   fetchText(url: string): Promise<string>;
   setTitle(title: string): void;
   toggleFullscreen(): void;
+  /** Opens one of the project's web pages (source, license) in the browser; other addresses are refused. */
+  openLink(url: string): void;
 }
 
 declare global {

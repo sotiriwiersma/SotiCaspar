@@ -190,6 +190,79 @@ function httpItem(type: 'HTTPGET' | 'HTTPPOST', method: HttpEffect['method'], ti
 export const httpGet = httpItem('HTTPGET', 'GET', 'HTTP GET');
 export const httpPost = httpItem('HTTPPOST', 'POST', 'HTTP POST');
 
+// ---------------------------------------------------------------- COMPANIONBUTTON
+
+export type CompanionButtonProps = ItemProps<{
+  host: string;
+  port: number;
+  page: number;
+  row: number;
+  column: number;
+  /** `Press` (down and up actions), `Down` (hold) or `Up` (release). */
+  action: string;
+  triggeronnext: boolean;
+  color: string;
+}>;
+
+export const COMPANION_ACTIONS = ['Press', 'Down', 'Up'] as const;
+
+/**
+ * The Bitfocus Companion HTTP remote control address of a button: `POST /api/location/<page>/<row>/<column>/<press|down|up>`.
+ * Pages count from 1, rows and columns from 0. Companion's "HTTP API" setting must be on.
+ */
+export function companionButtonUrl(p: Pick<CompanionButtonProps, 'host' | 'port' | 'page' | 'row' | 'column' | 'action'>): string | null {
+  const host = String(p.host ?? '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  const action = COMPANION_ACTIONS.find((a) => a.toLowerCase() === String(p.action).toLowerCase());
+  const whole = (n: unknown, min: number) => Number.isInteger(Number(n)) && Number(n) >= min;
+  if (!host || !action || !whole(p.port, 1) || !whole(p.page, 1) || !whole(p.row, 0) || !whole(p.column, 0)) return null;
+  return `http://${host}:${Number(p.port)}/api/location/${Number(p.page)}/${Number(p.row)}/${Number(p.column)}/${action.toLowerCase()}`;
+}
+
+/** Nothing is scheduled without a complete button address. */
+const requireButton: TriggerFn<CompanionButtonProps> = ({ p }) => (companionButtonUrl(p) ? undefined : IGNORED);
+
+export const companionButton = defineItem<CompanionButtonProps>({
+  type: 'COMPANIONBUTTON',
+  title: 'Companion Button',
+  category: 'output',
+  color: ROW_COLORS.http,
+  fields: [
+    { key: 'host', type: 'string', default: '127.0.0.1' },
+    { key: 'port', type: 'int', default: 8000 },
+    { key: 'page', type: 'int', default: 1 },
+    { key: 'row', type: 'int', default: 0 },
+    { key: 'column', type: 'int', default: 0 },
+    { key: 'action', type: 'string', default: 'Press' },
+    { key: 'triggeronnext', type: 'bool', default: false }
+  ],
+  widgetFields: [COLOR_FIELD],
+  inspector: [
+    {
+      title: 'Companion Button',
+      controls: [
+        { kind: 'text', key: 'host', label: 'Companion', placeholder: '127.0.0.1' },
+        { kind: 'int', key: 'port', label: 'Port', min: 1, max: 65535 },
+        { kind: 'int', key: 'page', label: 'Page', min: 1, max: 999 },
+        { kind: 'int', key: 'row', label: 'Row (from 0)', min: 0, max: 99 },
+        { kind: 'int', key: 'column', label: 'Column (from 0)', min: 0, max: 99 },
+        { kind: 'select', key: 'action', label: 'Action', options: [...COMPANION_ACTIONS] },
+        { kind: 'bool', key: 'triggeronnext', label: 'Trigger on next' }
+      ]
+    }
+  ],
+  hiddenCommonBlocks: ['device', 'channel', 'layer', 'duration'],
+  durationless: true,
+  triggerOnNext: (p) => p.triggeronnext,
+  triggers: { ...NO_PAUSE, Play: requireButton, Update: requireButton },
+  ops: NO_AMCP,
+  effects: {
+    play: ({ p }) => {
+      const url = companionButtonUrl(p);
+      return url ? [{ kind: 'http', method: 'POST', url, data: [] }] : [];
+    }
+  }
+});
+
 // ---------------------------------------------------------------- OSCOUTPUT
 
 export type OscOutputProps = ItemProps<{

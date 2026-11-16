@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import type { BackendApi, BackendEvents } from '@soticaspar/core';
 import type { MenuState } from '../shared/commands';
 import { BACKEND_EVENTS, BACKEND_METHODS, channels, type BackendEventEnvelope } from '../shared/ipc';
-import type { PickOptions, SaveOptions } from '../shared/shell';
+import { OPEN_LINKS, type PickOptions, type SaveOptions } from '../shared/shell';
 import { fetchText, pickFile, readTextFile, saveFile } from './files';
 import { applyMenu } from './menu';
 
@@ -44,7 +44,15 @@ export function registerIpc(backend: Backend, getWindow: () => BrowserWindow | n
   ipcMain.handle(channels.readFile, (_e, path: string) => readTextFile(path));
   ipcMain.handle(channels.saveFile, (_e, path: string | null, content: string, options?: SaveOptions) => saveFile(getWindow(), path, content, options));
   ipcMain.handle(channels.fetchText, (_e, url: string) => fetchText(url));
-  ipcMain.on(channels.setTitle, (_e, title: string) => getWindow()?.setTitle(title));
+  ipcMain.on(channels.setTitle, (_e, title: string) => {
+    // Setting the title repaints the frame, menu bar included: only do it for a real change.
+    const window = getWindow();
+    if (window && window.getTitle() !== title) window.setTitle(title);
+  });
+  ipcMain.on(channels.openLink, (_e, url: unknown) => {
+    // Only the fixed project pages; never an address the page made up.
+    if (typeof url === 'string' && (OPEN_LINKS as readonly string[]).includes(url)) void shell.openExternal(url);
+  });
   ipcMain.on(channels.toggleFullscreen, () => {
     const window = getWindow();
     window?.setFullScreen(!window.isFullScreen());
@@ -64,6 +72,6 @@ export function registerIpc(backend: Backend, getWindow: () => BrowserWindow | n
     for (const stop of unsubscribers) stop();
     for (const method of BACKEND_METHODS) ipcMain.removeHandler(channels.invoke(method));
     for (const channel of [channels.appInfo, channels.pickFile, channels.readFile, channels.saveFile, channels.fetchText]) ipcMain.removeHandler(channel);
-    for (const channel of [channels.setTitle, channels.toggleFullscreen, channels.menuState]) ipcMain.removeAllListeners(channel);
+    for (const channel of [channels.setTitle, channels.toggleFullscreen, channels.menuState, channels.openLink]) ipcMain.removeAllListeners(channel);
   };
 }

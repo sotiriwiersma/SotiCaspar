@@ -30,6 +30,10 @@ let closeApproved = false;
 
 app.setName('SotiCaspar');
 
+// A separate settings folder, and with it a separate single-instance lock: lets a second copy run, e.g. for testing.
+const userDataDir = process.env['SOTICASPAR_USER_DATA'];
+if (userDataDir) app.setPath('userData', userDataDir);
+
 /** Asks the renderer whether closing is fine (unsaved rundowns) before the window goes away. */
 function guardClose(target: BrowserWindow): void {
   target.on('close', (event) => {
