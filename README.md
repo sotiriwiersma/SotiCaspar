@@ -22,29 +22,36 @@ anywhere. Settings are kept in `%APPDATA%\SotiCaspar`. Requires CasparCG Server 
 ## Companion button presses
 
 A rundown can press buttons in [Bitfocus Companion](https://bitfocus.io/companion), for example to switch lights, a
-vision mixer or anything else Companion controls, in step with your playout.
+vision mixer or anything else Companion controls, in step with your playout. SotiCaspar uses Companion's TCP/UDP
+remote control.
 
-**In Companion:** open the settings and turn on **HTTP API** (under Protocols). Note Companion's port (8000 by default).
-On a PC that also runs CasparCG, port 8000 is usually taken by the media scanner: give Companion another port, such as
-8888.
+**In Companion:** open the settings and, under Protocols, turn on the **TCP Listener** (or the **UDP Listener**). Note
+its port: Companion's default is 16759.
 
-**In SotiCaspar:** add **Companion Button** from Tools › Output to the rundown and set it in the Inspector:
+**In SotiCaspar:** set where Companion is once, in **Settings › Devices › Bitfocus Companion**:
+
+| Setting | Meaning |
+| --- | --- |
+| Address | The PC running Companion (`127.0.0.1` when it is this PC) |
+| Port | The port of Companion's TCP or UDP listener |
+| Protocol | **TCP** (recommended: one open connection, and Companion's errors are shown) or **UDP** |
+
+**Test connection** checks that Companion answers (TCP only; UDP has no answer to check).
+
+Then add **Companion Button** from Tools › Output to the rundown and choose the button in the Inspector:
 
 | Field | Meaning |
 | --- | --- |
-| Companion | Address of the PC running Companion (`127.0.0.1` when it is this PC) |
-| Port | Companion's port |
 | Page | Button page, counting from 1 |
 | Row, Column | Button position, counting from 0 (the top left button is row 0, column 0) |
 | Action | **Press** (press and release), **Down** (press and hold) or **Up** (release) |
 
 Playing the item (F2, or as part of a group, auto-step or a delay) sends the action to Companion. *Trigger on next*
-makes it fire on Next instead. Behind the scenes this is `POST http://<companion>:<port>/api/location/<page>/<row>/<column>/press`
-(or `down` / `up`).
+makes it fire on Next instead. Behind the scenes this is the line `LOCATION <page>/<row>/<column> PRESS` (or `DOWN` /
+`UP`).
 
-If nothing happens, test the button outside SotiCaspar with
-`curl -X POST http://127.0.0.1:8888/api/location/1/0/0/press` (your address, port and button). SotiCaspar reports an
-error only when it cannot reach Companion; a wrong button, or the HTTP API being off, does not show an error.
+Over TCP, SotiCaspar shows an error when Companion cannot be reached or refuses a command (such as a page that does not
+exist). Over UDP nothing comes back, so a wrong button or a closed listener goes unnoticed.
 
 ## License
 
@@ -117,11 +124,8 @@ rundown rows and the engine all pick it up from the registry.
   2.5 ignores seeks into the last second of some files (seen with VP9 WebM), so a step there can do nothing.
 - **Leftover live streams.** A stream the app could not remove (crash, forced quit) is removed when the server
   connects, and before each new Live stream on that channel. Only streams to this PC's stream port are touched.
-- **Companion Button.** An output item (Tools › Output) that presses, holds or releases a button in Bitfocus Companion
-  through its HTTP remote control: `POST http://<host>:<port>/api/location/<page>/<row>/<column>/press` (or `down` /
-  `up`). Pages count from 1, rows and columns from 0. Turn on *HTTP API* in Companion's settings. Companion's default
-  port is 8000, which on a CasparCG machine is usually taken by the media scanner: give Companion another port there.
-  Like the HTTP items, only a failed connection is reported, not an error answer from Companion.
+- **Companion Button.** An output item that presses, holds or releases a button in Bitfocus Companion over its TCP or
+  UDP remote control. See [Companion button presses](#companion-button-presses).
 - **Countdown bar.** The bar at the top follows (▾ menu) the video that was started last, the selected row or a fixed
   channel-layer: played, remaining and total time
   as `hh:mm:ss:ff`, and a position bar to click or drag to jump to a point (`CALL … SEEK`). It needs the OSC

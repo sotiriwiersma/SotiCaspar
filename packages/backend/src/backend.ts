@@ -3,6 +3,7 @@ import type {
   AppSettings,
   BackendApi,
   BackendEvents,
+  CompanionPress,
   DeviceCommands,
   DeviceConfig,
   DeviceStatus,
@@ -14,7 +15,7 @@ import type {
   RepositorySubscription,
   Unsubscribe
 } from '@soticaspar/core';
-import { amcp } from '@soticaspar/core';
+import { amcp, companionCommand } from '@soticaspar/core';
 import { ConfigStore } from './config-store';
 import { isSuccess } from './amcp-parser';
 import { DeviceManager } from './device-manager';
@@ -25,7 +26,7 @@ import { JsonFile } from './json-file';
 import { Library } from './library';
 import { OscRouter } from './osc-router';
 import { ServiceSlot } from './service-slot';
-import { OscControlServer, OscMonitor, OscSender, OscWebSocketServer, RrupClient, StreamRelay, sendHttp } from './services/index';
+import { CompanionClient, OscControlServer, OscMonitor, OscSender, OscWebSocketServer, RrupClient, StreamRelay, sendHttp, type CompanionTarget } from './services/index';
 import { ThumbnailCache } from './thumbnails';
 
 export interface BackendOptions {
@@ -52,6 +53,7 @@ class BackendImpl implements Backend {
   private readonly control: ServiceSlot;
   private readonly webSocket: ServiceSlot;
   private readonly streamRelay: StreamRelay;
+  private readonly companion: CompanionClient;
   /** Where the server currently streams to, so the consumer can be removed again. */
   private liveStream: { deviceName: string; channel: number; port: number } | undefined;
   private readonly repositories = new Map<string, RrupClient>();
@@ -90,6 +92,7 @@ class BackendImpl implements Backend {
     this.control = new ServiceSlot('OSC control server', (port) => new OscControlServer(port, (command) => this.emitter.emit('control-command', command), log), log);
     this.webSocket = new ServiceSlot('OSC WebSocket server', (port) => new OscWebSocketServer(port, (command) => this.emitter.emit('control-command', command), log), log);
     this.streamRelay = new StreamRelay(log);
+    this.companion = new CompanionClient(log);
 
     this.ready = this.start();
     this.ready.catch((error) => log('error', `Backend failed to start: ${String(error)}`));
@@ -108,6 +111,7 @@ class BackendImpl implements Backend {
     await this.stopLiveStream();
     for (const client of this.repositories.values()) client.stop();
     this.repositories.clear();
+    this.companion.close();
     await Promise.all([this.monitor.stop(), this.control.stop(), this.webSocket.stop()]);
     this.devices.dispose();
     await Promise.all([this.store.flush(), this.library.flush()]);
@@ -127,6 +131,8 @@ class BackendImpl implements Backend {
     const settings = await this.store.updateSettings(patch);
     await this.applySettings(settings);
     if (!previous.showThumbnailTooltip && settings.showThumbnailTooltip) void this.refreshLibrary();
+    const companionChanged = (['companionAddress', 'companionPort', 'companionProtocol'] as const).some((key) => previous[key] !== settings[key]);
+    if (companionChanged) this.companion.close();
     return settings;
   }
 
@@ -217,6 +223,32 @@ class BackendImpl implements Backend {
 
   async sendGpo(port: number): Promise<void> {
     this.log('warn', `GPO ${port} ignored: GPI is not supported`);
+  }
+
+  // ---------------------------------------------------------------- Bitfocus Companion
+
+  private companionTarget(): CompanionTarget {
+    const { companionAddress, companionPort, companionProtocol } = this.store.settings();
+    const host = companionAddress.trim();
+    if (!host) throw new Error('No Companion address in Settings › Devices');
+    return { protocol: companionProtocol, host, port: companionPort };
+  }
+
+  async sendCompanion(press: CompanionPress): Promise<void> {
+    await this.ready;
+    const target = this.companionTarget();
+    const command = companionCommand(press);
+    this.log('debug', `Companion ${target.protocol} ${target.host}:${target.port}: ${command}`);
+    await this.companion.send(target, command);
+  }
+
+  async testCompanion(): Promise<string> {
+    await this.ready;
+    const target = this.companionTarget();
+    await this.companion.check(target);
+    return target.protocol === 'TCP'
+      ? `Connected to Companion at ${target.host}:${target.port}.`
+      : `UDP has no answer, so the connection cannot be checked. Commands go to ${target.host}:${target.port}.`;
   }
 
   // ---------------------------------------------------------------- Library

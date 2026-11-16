@@ -44,7 +44,7 @@ const IDLE: Readonly<ItemRuntime> = { used: false, flash: 0, flashKind: 'other',
 export type EngineSettings = Pick<AppSettings, 'delayType' | 'markUsedItems' | 'previewOnAutoStep' | 'clearDelayedCommandsOnAutoStep'>;
 
 export interface EngineEnv {
-  backend: Pick<BackendApi, 'sendCommands' | 'sendCustomCommand' | 'sendOsc' | 'sendHttp' | 'sendGpo'>;
+  backend: Pick<BackendApi, 'sendCommands' | 'sendCustomCommand' | 'sendOsc' | 'sendHttp' | 'sendGpo' | 'sendCompanion'>;
   devices(): readonly DeviceConfig[];
   settings(): EngineSettings;
   clock: Clock;
@@ -61,6 +61,10 @@ export interface EngineEnv {
   onError(message: string): void;
   onChange(): void;
 }
+
+/** The message of an error, without the wrapping Electron adds when it comes from the main process. */
+export const errorText = (error: unknown): string =>
+  (error instanceof Error ? error.message : String(error)).replace(/^Error invoking remote method '[^']*': (?:\w*Error: )?/, '');
 
 const flag = (props: TreeNode['props'], key: string): boolean => props[key] === true || props[key] === 'true';
 const base = (item: TreeItem): BaseProps => item.props as unknown as BaseProps;
@@ -397,7 +401,7 @@ export class RundownEngine {
 
   private dispatchEffect(effect: SideEffect, targets: readonly DeviceTarget[]): void {
     const { backend } = this.env;
-    const fail = (e: unknown): void => this.env.onError(`Output failed: ${String(e)}`);
+    const fail = (e: unknown): void => this.env.onError(`Output failed: ${errorText(e)}`);
     switch (effect.kind) {
       case 'http':
         backend.sendHttp({ method: effect.method, url: effect.url, data: effect.data }).catch(fail);
@@ -407,6 +411,10 @@ export class RundownEngine {
         break;
       case 'gpo':
         backend.sendGpo(effect.port).catch(fail);
+        break;
+      case 'companion':
+        // The backend's messages already start with "Companion" or name it.
+        backend.sendCompanion(effect.press).catch((e: unknown) => this.env.onError(errorText(e)));
         break;
       case 'custom':
         if (!this.env.commandsDisabled()) {

@@ -74,6 +74,14 @@ describe('RundownEngine', () => {
       expect(h.sent).toEqual(['A: STOP 1-10']);
     });
 
+    it('presses a Companion button on Play', () => {
+      const h = harness();
+      const [button] = fill(h, [createItem('COMPANIONBUTTON', { props: { page: 2, row: 1, column: 3, action: 'Down' } })]);
+      h.engine.trigger('Play', button.id);
+      expect(h.effects).toEqual(['companion 2/1/3 Down']);
+      expect(h.sent).toEqual([]);
+    });
+
     it('plays the loaded clip only while the server reports it loaded', () => {
       const h = harness();
       const [clip] = fill(h, [movie('CLIP')]);

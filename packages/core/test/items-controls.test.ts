@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IDLE_STATE, amcp, buildCommands, buildEffects, createItem, getItemDefinition, parseRundown, resolveTrigger, serializeRundown } from '../src';
+import { IDLE_STATE, amcp, buildCommands, buildEffects, companionCommand, createItem, getItemDefinition, parseRundown, resolveTrigger, serializeRundown } from '../src';
 import type { PlayoutOp, Props, RundownItem } from '../src';
 
 type Pairs = ReadonlyArray<readonly [string, string]>;
@@ -350,28 +350,32 @@ describe('Companion button', () => {
   const def = () => getItemDefinition('COMPANIONBUTTON')!;
   const item = (props: Props = {}) => createItem('COMPANIONBUTTON', { props });
 
-  it('starts on Companion on this PC, page 1, the first button, press', () => {
-    expect(item().props).toMatchObject({ host: '127.0.0.1', port: 8000, page: 1, row: 0, column: 0, action: 'Press' });
+  it('starts on page 1, the first button, press', () => {
+    expect(item().props).toMatchObject({ page: 1, row: 0, column: 0, action: 'Press' });
+    expect(item().props).not.toHaveProperty('host');
   });
 
-  it('presses, holds or releases a button through the HTTP remote control', () => {
+  it('presses, holds or releases a button', () => {
     const effects = (props: Props) => buildEffects(def(), item(props), 'play', IDLE_STATE);
-    expect(effects({ page: 2, row: 1, column: 4 })).toEqual([{ kind: 'http', method: 'POST', url: 'http://127.0.0.1:8000/api/location/2/1/4/press', data: [] }]);
-    expect(effects({ host: 'http://10.0.0.9/', port: 8888, action: 'Down' })[0]).toMatchObject({ url: 'http://10.0.0.9:8888/api/location/1/0/0/down' });
-    expect(effects({ action: 'up' })[0]).toMatchObject({ url: 'http://127.0.0.1:8000/api/location/1/0/0/up' });
+    expect(effects({ page: 2, row: 1, column: 4 })).toEqual([{ kind: 'companion', press: { page: 2, row: 1, column: 4, action: 'Press' } }]);
+    expect(effects({ action: 'down' })).toEqual([{ kind: 'companion', press: { page: 1, row: 0, column: 0, action: 'Down' } }]);
   });
 
-  it('does nothing without a complete address', () => {
-    for (const props of [{ host: '' }, { page: 0 }, { row: -1 }, { port: 0 }, { action: 'Rotate' }]) {
-      expect(resolveTrigger(def(), item(props), 'Play', IDLE_STATE).op, JSON.stringify(props)).toBeNull();
-    }
+  it('writes the command Companion reads over TCP and UDP', () => {
+    expect(companionCommand({ page: 2, row: 1, column: 4, action: 'Press' })).toBe('LOCATION 2/1/4 PRESS');
+    expect(companionCommand({ page: 1, row: 0, column: 0, action: 'Up' })).toBe('LOCATION 1/0/0 UP');
+  });
+
+  it('does nothing without a complete button address', () => {
+    const incomplete: Props[] = [{ page: 0 }, { row: -1 }, { column: 1.5 }, { action: 'Rotate' }];
+    for (const props of incomplete) expect(resolveTrigger(def(), item(props), 'Play', IDLE_STATE).op, JSON.stringify(props)).toBeNull();
     expect(resolveTrigger(def(), item(), 'Play', IDLE_STATE).op).not.toBeNull();
   });
 
   it('keeps its button in the rundown file', () => {
-    const written = serializeRundown({ items: [item({ host: 'companion.local', port: 8001, page: 3, row: 2, column: 7, action: 'Down' })] } as never);
+    const written = serializeRundown({ items: [item({ page: 3, row: 2, column: 7, action: 'Down' })] } as never);
     const read = parseRundown(written).items[0] as RundownItem;
     expect(read.type).toBe('COMPANIONBUTTON');
-    expect(read.props).toMatchObject({ host: 'companion.local', port: 8001, page: 3, row: 2, column: 7, action: 'Down' });
+    expect(read.props).toMatchObject({ page: 3, row: 2, column: 7, action: 'Down' });
   });
 });

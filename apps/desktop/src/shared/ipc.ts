@@ -23,6 +23,8 @@ export const BACKEND_METHODS = [
   'sendOsc',
   'sendHttp',
   'sendGpo',
+  'sendCompanion',
+  'testCompanion',
   'getLibrary',
   'refreshLibrary',
   'retrieveData',

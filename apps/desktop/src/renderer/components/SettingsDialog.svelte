@@ -54,6 +54,17 @@
     await app.reloadOscOutputs();
   }
 
+  let companionTest = $state<'testing' | { ok: boolean; text: string } | null>(null);
+
+  async function testCompanion(): Promise<void> {
+    companionTest = 'testing';
+    try {
+      companionTest = { ok: true, text: await backend.testCompanion() };
+    } catch (error) {
+      companionTest = { ok: false, text: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   const status = (name: string): string => (app.isConnected(name) ? 'Connected' : 'Disconnected');
 </script>
 
@@ -153,6 +164,24 @@
           <button type="button" disabled={!selectedDevice} onclick={() => (deviceDialog = { device: app.deviceByName(selectedDevice ?? '') })}>Edit...</button>
           <button type="button" disabled={!selectedDevice} onclick={removeDevice}>Remove</button>
           <button type="button" onclick={() => (importDialog = true)}>Import...</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Bitfocus Companion</legend>
+        <p class="muted note">Companion Button items press buttons here. In Companion's settings, turn on the TCP or UDP listener with the same port.</p>
+        <label class="row">Address<input type="text" value={s.companionAddress} placeholder="127.0.0.1" onchange={(e) => set('companionAddress', e.currentTarget.value.trim())} /></label>
+        <label class="row">Port<input type="number" min="1" max="65535" value={s.companionPort} onchange={integer('companionPort', 1)} /></label>
+        <label class="row">Protocol
+          <select value={s.companionProtocol} onchange={(e) => set('companionProtocol', e.currentTarget.value as AppSettings['companionProtocol'])}>
+            <option value="TCP">TCP</option>
+            <option value="UDP">UDP</option>
+          </select>
+        </label>
+        <div class="buttons">
+          <button type="button" disabled={companionTest === 'testing'} onclick={testCompanion}>Test connection</button>
+          {#if companionTest && companionTest !== 'testing'}
+            <span class:ok={companionTest.ok} class="test-result" role="status">{companionTest.text}</span>
+          {/if}
         </div>
       </fieldset>
     {:else if tab === 'gpi'}
@@ -325,6 +354,15 @@
   .state {
     margin-left: auto;
     color: var(--danger);
+  }
+
+  .test-result {
+    align-self: center;
+    color: var(--danger);
+  }
+
+  .test-result.ok {
+    color: var(--active);
   }
 
   .state.ok {

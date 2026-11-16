@@ -6,3 +6,4 @@ export { OscSender } from './osc-sender';
 export { sendHttp } from './http-request';
 export { StreamRelay } from './stream-relay';
 export { RrupClient } from './rrup-client';
+export { CompanionClient, type CompanionTarget } from './companion-client';

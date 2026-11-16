@@ -107,7 +107,8 @@ export function harness(options: { devices?: DeviceConfig[]; settings?: Partial<
       },
       sendOsc: record('osc'),
       sendHttp: async (request) => void effects.push(`http ${request.method} ${request.url}`),
-      sendGpo: record('gpo')
+      sendGpo: record('gpo'),
+      sendCompanion: async (press) => void effects.push(`companion ${press.page}/${press.row}/${press.column} ${press.action}`)
     },
     devices: () => devices,
     settings: () => ({ ...DEFAULT_SETTINGS, ...settings }),

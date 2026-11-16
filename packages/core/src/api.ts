@@ -2,6 +2,7 @@
  * Contract between the UI (renderer) and the backend (Node, runs in the Electron main process).
  * Both sides are implemented against these types, so they can be built and tested separately.
  */
+import type { CompanionPress, CompanionProtocol } from './companion';
 import type { DeviceCommands } from './playout';
 
 // ---------------------------------------------------------------- Persisted configuration
@@ -82,6 +83,10 @@ export interface AppSettings {
   countdownSource: 'latest' | 'selected' | 'layer';
   /** The layer of the `layer` source: `device|channel|layer`. */
   countdownLayer: string;
+  /** Bitfocus Companion that Companion Button items press buttons in (Settings › Devices). */
+  companionAddress: string;
+  companionPort: number;
+  companionProtocol: CompanionProtocol;
   markUsedItems: boolean;
   useFreezeOnLoad: boolean;
   disableAudioInStream: boolean;
@@ -129,6 +134,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showCountdownBar: true,
   countdownSource: 'latest',
   countdownLayer: '',
+  companionAddress: '127.0.0.1',
+  companionPort: 16759,
+  companionProtocol: 'TCP',
   markUsedItems: false,
   useFreezeOnLoad: false,
   disableAudioInStream: true,
@@ -264,6 +272,10 @@ export interface BackendApi {
   sendHttp(request: { method: 'GET' | 'POST'; url: string; data: Array<{ key: string; value: string }> }): Promise<void>;
   /** Pulses a GPI output port. */
   sendGpo(port: number): Promise<void>;
+  /** Presses, holds or releases a Companion button over the connection in the settings. Rejects when Companion cannot be reached or refuses. */
+  sendCompanion(press: CompanionPress): Promise<void>;
+  /** Checks the Companion connection in the settings; resolves with a sentence for the user, rejects with the problem. */
+  testCompanion(): Promise<string>;
 
   // Library
   getLibrary(): Promise<LibraryEntry[]>;

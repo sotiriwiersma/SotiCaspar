@@ -1,5 +1,7 @@
 import {
   DEFAULT_SETTINGS,
+  companionCommand,
+  type CompanionPress,
   type AppSettings,
   type BackendApi,
   type BackendEvents,
@@ -165,6 +167,13 @@ export class MockBackend implements BackendApi {
   async sendOsc(): Promise<void> {}
   async sendHttp(): Promise<void> {}
   async sendGpo(): Promise<void> {}
+  readonly companionPresses: string[] = [];
+  async sendCompanion(press: CompanionPress): Promise<void> {
+    this.companionPresses.push(companionCommand(press));
+  }
+  async testCompanion(): Promise<string> {
+    return `Mock: commands would go to ${this.settings.companionAddress}:${this.settings.companionPort} (${this.settings.companionProtocol}).`;
+  }
 
   async getLibrary(): Promise<LibraryEntry[]> {
     return this.library.map((e) => ({ ...e }));

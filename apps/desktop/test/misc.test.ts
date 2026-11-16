@@ -170,3 +170,12 @@ describe('device import', () => {
     expect(() => parseDeviceImport('<other/>')).toThrow();
   });
 });
+
+describe('error text', () => {
+  it('drops the wrapping Electron adds to errors from the main process', async () => {
+    const { errorText } = await import('../src/renderer/engine/engine');
+    expect(errorText(new Error("Error invoking remote method 'backend:sendCompanion': Error: Companion: Page not found"))).toBe('Companion: Page not found');
+    expect(errorText(new Error('Cannot reach Companion at 127.0.0.1:16759: connect ECONNREFUSED'))).toBe('Cannot reach Companion at 127.0.0.1:16759: connect ECONNREFUSED');
+    expect(errorText('plain')).toBe('plain');
+  });
+});

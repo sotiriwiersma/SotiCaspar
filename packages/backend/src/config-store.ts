@@ -81,10 +81,13 @@ function sanitizeClipDefaults(raw: unknown): ClipDefaults {
   return result;
 }
 
-export const sanitizeSettings = (raw: unknown): AppSettings => ({
-  ...pickKnown(raw, DEFAULT_SETTINGS),
-  clipDefaults: sanitizeClipDefaults(isRecord(raw) ? raw.clipDefaults : undefined)
-});
+export function sanitizeSettings(raw: unknown): AppSettings {
+  const settings = { ...pickKnown(raw, DEFAULT_SETTINGS), clipDefaults: sanitizeClipDefaults(isRecord(raw) ? raw.clipDefaults : undefined) };
+  // Values the UI offers as a choice or a range: anything else falls back to the default.
+  if (settings.companionProtocol !== 'TCP' && settings.companionProtocol !== 'UDP') settings.companionProtocol = DEFAULT_SETTINGS.companionProtocol;
+  if (!Number.isInteger(settings.companionPort) || settings.companionPort < 1 || settings.companionPort > 65535) settings.companionPort = DEFAULT_SETTINGS.companionPort;
+  return settings;
+}
 
 /** Persists the application configuration as JSON files in a data directory. */
 export class ConfigStore {

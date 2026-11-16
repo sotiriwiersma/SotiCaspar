@@ -10,6 +10,7 @@ export * from './playout';
 export * from './rundown';
 export * from './list';
 export * from './api';
+export * from './companion';
 export * from './items/index';
 export { parseXml, renderXml } from './xml';
 

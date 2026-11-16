@@ -1,4 +1,5 @@
 import type { BaseProps } from './base';
+import type { CompanionPress } from './companion';
 import type { PlayoutType } from './base';
 import type { ConfigLookupName, LookupName } from './lookups';
 import type { FieldDef, PropValue, Props, RundownItem } from './types';
@@ -68,6 +69,8 @@ export type SideEffect =
   | { kind: 'http'; method: 'GET' | 'POST'; url: string; data: Array<{ key: string; value: string }> }
   | { kind: 'osc'; output: string; path: string; type: string; value: string; useBundle: boolean }
   | { kind: 'gpo'; port: number }
+  /** Presses, holds or releases a button in Bitfocus Companion (the global Companion connection in the settings). */
+  | { kind: 'companion'; press: CompanionPress }
   /** Sends a raw AMCP command to the item's device and every shadow device (CUSTOMCOMMAND). */
   | { kind: 'custom'; command: string }
   /** Fires a rundown-wide playout trigger (PLAYOUTCOMMAND). */
