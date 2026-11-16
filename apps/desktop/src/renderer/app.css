@@ -1,0 +1,154 @@
+/* Dark theme after the Qt "Flat" stylesheet. */
+:root {
+  --bg: rgb(45, 45, 45);
+  --bg-dark: rgb(35, 35, 35);
+  --bg-darker: rgb(28, 28, 28);
+  --border: rgb(65, 65, 65);
+  --accent: rgb(70, 115, 195);
+  --accent-soft: rgba(70, 115, 195, 0.25);
+  --accent-faint: rgba(70, 115, 195, 0.12);
+  --text: rgb(255, 255, 255);
+  --text-dim: rgb(190, 190, 190);
+  --disabled: rgb(128, 128, 128);
+  --danger: firebrick;
+  --warn: darkorange;
+  --active: rgb(0, 255, 0);
+  --radius: 0px;
+  --font-size: 12px;
+  color-scheme: dark;
+}
+
+:root[data-theme='Curve'] {
+  --radius: 4px;
+  --bg: rgb(50, 52, 56);
+  --bg-dark: rgb(38, 40, 44);
+  --bg-darker: rgb(30, 32, 35);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: var(--font-size);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+select,
+textarea {
+  background: var(--bg-darker);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled,
+button:disabled {
+  color: var(--disabled);
+}
+
+input.invalid,
+select.invalid {
+  border-color: var(--danger);
+}
+
+button {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+button.icon {
+  padding: 2px 6px;
+  line-height: 1;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--disabled);
+}
+
+.panel-title {
+  padding: 4px 8px;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--text-dim);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

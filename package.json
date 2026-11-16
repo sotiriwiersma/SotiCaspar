@@ -1,0 +1,23 @@
+{
+  "name": "soticaspar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A modern, maintainable rewrite of the CasparCG Client",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "npm run dev -w @soticaspar/desktop",
+    "build": "npm run build -w @soticaspar/desktop"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^5.9.0",
+    "vitest": "^5.1.0"
+  }
+}

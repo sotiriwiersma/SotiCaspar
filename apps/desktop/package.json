@@ -1,0 +1,29 @@
+{
+  "name": "@soticaspar/desktop",
+  "version": "0.1.0",
+  "productName": "SotiCaspar",
+  "private": true,
+  "type": "module",
+  "description": "SotiCaspar desktop client (Electron + Svelte)",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:web": "vite --config vite.web.config.ts",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && svelte-check --tsconfig ./tsconfig.web.json",
+    "test": "vitest run --root ../.."
+  },
+  "dependencies": {
+    "@cycjimmy/jsmpeg-player": "^7.0.0",
+    "@soticaspar/backend": "*",
+    "@soticaspar/core": "*"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "electron": "^45.3.3",
+    "electron-vite": "^6.0.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.8"
+  }
+}
