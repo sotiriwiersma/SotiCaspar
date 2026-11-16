@@ -16,8 +16,20 @@ SotiCaspar is not made, endorsed or supported by the CasparCG project or Sverige
 ## Download
 
 Windows: download `SotiCaspar-<version>-portable.exe` from the
-[Releases](https://github.com/sotiriwiersma/SotiCaspar/releases) page. It needs no installation: start it from
+[latest release](https://github.com/sotiriwiersma/SotiCaspar/releases/latest). It needs no installation: start it from
 anywhere. Settings are kept in `%APPDATA%\SotiCaspar`. Requires CasparCG Server 2.3 or newer (tested with 2.5).
+
+## What's new
+
+**0.1.1**
+
+- Companion Button items now use Companion's **TCP/UDP remote control** instead of its HTTP API. Where Companion is
+  (address, port, TCP or UDP) is set once in **Settings › Devices › Bitfocus Companion**, with a *Test connection*
+  button; each button item only holds page, row, column and action. Over TCP, Companion's errors (such as a page that
+  does not exist) are shown. Rundowns with 0.1.0 Companion buttons keep their page, row, column and action.
+- Clearer error messages for outputs.
+
+**0.1.0**: first release.
 
 ## Companion button presses
 
