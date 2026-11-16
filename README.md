@@ -11,7 +11,7 @@ features of its own (see [Differences](#differences-from-the-qt-client)).
 
 SotiCaspar is not made, endorsed or supported by the CasparCG project or Sveriges Television AB.
 
-<img width="1918" height="1035" alt="image" src="https://github.com/user-attachments/assets/2083488f-b38d-493d-976a-8ebaf1aee4b6" />
+<img width="1918" height="1031" alt="image" src="https://github.com/user-attachments/assets/8edd910b-f2dc-4cdf-8762-0960eb358553" />
 
 ## Download
 
