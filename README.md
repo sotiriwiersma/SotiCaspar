@@ -19,6 +19,33 @@ Windows: download `SotiCaspar-<version>-portable.exe` from the
 [Releases](https://github.com/sotiriwiersma/SotiCaspar/releases) page. It needs no installation: start it from
 anywhere. Settings are kept in `%APPDATA%\SotiCaspar`. Requires CasparCG Server 2.3 or newer (tested with 2.5).
 
+## Companion button presses
+
+A rundown can press buttons in [Bitfocus Companion](https://bitfocus.io/companion), for example to switch lights, a
+vision mixer or anything else Companion controls, in step with your playout.
+
+**In Companion:** open the settings and turn on **HTTP API** (under Protocols). Note Companion's port (8000 by default).
+On a PC that also runs CasparCG, port 8000 is usually taken by the media scanner: give Companion another port, such as
+8888.
+
+**In SotiCaspar:** add **Companion Button** from Tools › Output to the rundown and set it in the Inspector:
+
+| Field | Meaning |
+| --- | --- |
+| Companion | Address of the PC running Companion (`127.0.0.1` when it is this PC) |
+| Port | Companion's port |
+| Page | Button page, counting from 1 |
+| Row, Column | Button position, counting from 0 (the top left button is row 0, column 0) |
+| Action | **Press** (press and release), **Down** (press and hold) or **Up** (release) |
+
+Playing the item (F2, or as part of a group, auto-step or a delay) sends the action to Companion. *Trigger on next*
+makes it fire on Next instead. Behind the scenes this is `POST http://<companion>:<port>/api/location/<page>/<row>/<column>/press`
+(or `down` / `up`).
+
+If nothing happens, test the button outside SotiCaspar with
+`curl -X POST http://127.0.0.1:8888/api/location/1/0/0/press` (your address, port and button). SotiCaspar reports an
+error only when it cannot reach Companion; a wrong button, or the HTTP API being off, does not show an error.
+
 ## License
 
 SotiCaspar is a modified version of the CasparCG Client and, like the original, is free software under the
