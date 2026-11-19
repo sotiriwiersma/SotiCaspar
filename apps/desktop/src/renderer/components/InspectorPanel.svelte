@@ -4,7 +4,7 @@
   import { LIBRARY_TYPE_OF_ITEM, typeTitle } from '../lib/definitions';
   import { editorFor, parseEntries, stringifyEntries, type KeyValueEntry } from '../lib/dataEditors';
   import { app } from '../stores/app.svelte';
-  import { applyCurrentProp, applyItemField, applyTypeProp, isItemField, readValue } from '../stores/inspector';
+  import { applyCurrentProp, applyItemField, applyTypeProp, isItemField, isMixedCommonValue, isMixedTypeValue, readValue } from '../stores/inspector';
   import { workspace } from '../stores/workspace.svelte';
   import ControlField from './ControlField.svelte';
   import InspectorCommon from './InspectorCommon.svelte';
@@ -30,6 +30,20 @@
     if (!type) return [];
     const device = node.deviceName;
     return app.library.filter((e) => e.type === type && (device === '' || e.deviceName === device)).map((e) => e.name);
+  });
+
+  // Controls whose value differs between the selected items they apply to. Target and label only change the
+  // current item, so they always show its own value.
+  const mixedKeys = $derived.by(() => {
+    workspace.revision;
+    if (!node || selectionSize < 2) return new Set<string>();
+    const isMixed = (c: Control) =>
+      c.key === '@deviceName' ? isMixedCommonValue('device', c.key) : !isItemField(c.key) && isMixedTypeValue(c.key, c.kind === 'bool');
+    return new Set(sections.flatMap((s) => s.controls).filter(isMixed).map((c) => c.key));
+  });
+  const mixedData = $derived.by(() => {
+    workspace.revision;
+    return !!dataEditor && selectionSize > 1 && isMixedTypeValue(dataEditor.prop);
   });
 
   function change(control: Control, value: string | number | boolean): void {
@@ -102,6 +116,7 @@
               {control}
               value={readValue(node, control.key)}
               suggestions={control.key === '@name' ? suggestions : []}
+              mixed={mixedKeys.has(control.key)}
               onchange={(value) => change(control, value)}
             />
           {/each}
@@ -111,6 +126,7 @@
       {#if dataEditor}
         <details open>
           <summary>{dataEditor.title}</summary>
+          {#if mixedData}<p class="muted">The selected items have different values: a change here applies this list to all of them.</p>{/if}
           <KeyValueEditor
             keyLabel={dataEditor.keyLabel}
             keyPrefix={dataEditor.keyPrefix}

@@ -1,5 +1,6 @@
 import type { PlayoutType } from '@soticaspar/core';
 import type { CommandId, MenuAction, MenuState } from '../../shared/commands';
+import { isEditable } from '../lib/keymap';
 import { shell } from '../lib/shell';
 import { app } from './app.svelte';
 import { library } from './library.svelte';
@@ -45,6 +46,11 @@ export function runCommand(action: MenuAction): void {
     case 'file.importPreset': return void library.importPreset();
     case 'file.exportPreset': return void library.exportSelectedPreset();
     case 'file.quit': return void window.close();
+    case 'edit.undo':
+    case 'edit.redo':
+      // A native menu accelerator (macOS) also fires inside text fields: give the key back to the field there.
+      if (isEditable(document.activeElement)) return void document.execCommand(id === 'edit.undo' ? 'undo' : 'redo');
+      return id === 'edit.undo' ? workspace.undo() : workspace.redo();
     case 'edit.settings': return ui.open('settings');
     case 'view.fullscreen': return shell.toggleFullscreen();
     case 'view.compact': return workspace.toggleCompact();
@@ -85,6 +91,9 @@ export function menuState(): MenuState {
   // Repository rundowns belong to the repository server (RundownWidget::repositoryRundown).
   if (workspace.repository) disabled.push('file.save', 'file.saveAs', 'rundown.allowRemote');
   else disabled.push('rundown.insertRepositoryChanges');
+
+  if (!workspace.canUndo) disabled.push('edit.undo');
+  if (!workspace.canRedo) disabled.push('edit.redo');
 
   if (workspace.compact) checked.push('view.compact');
   if (workspace.allowRemote) checked.push('rundown.allowRemote');

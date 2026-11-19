@@ -102,9 +102,17 @@ export interface AppSettings {
    * properties that differ from the item's own defaults are stored.
    */
   clipDefaults: ClipDefaults;
+  /** Own colors of the "Colorize Item" menu, added with the color picker. */
+  customColors: CustomColor[];
 }
 
 export type ClipDefaults = Record<string, Record<string, string | number | boolean>>;
+
+/** A row color with its menu name. `value` uses the rundown file format, `rgba(r, g, b, a)` with 0-255 parts. */
+export interface CustomColor {
+  name: string;
+  value: string;
+}
 
 export const DEFAULT_SETTINGS: AppSettings = {
   fontSize: 12,
@@ -146,7 +154,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   logLevel: -1,
   useDropFrameNotation: false,
   openRecent: 10,
-  clipDefaults: {}
+  clipDefaults: {},
+  customColors: []
 };
 
 // ---------------------------------------------------------------- Library

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COMMANDS } from '../src/shared/commands';
 import { countdownView } from '../src/renderer/engine/duration';
-import { toMilliseconds } from '../src/renderer/engine/devices';
+import { channelCount, toMilliseconds } from '../src/renderer/engine/devices';
 import {
   applyOsc,
   emptyFileState,
@@ -128,6 +128,14 @@ describe('delay conversion', () => {
     expect(toMilliseconds(1, 'Frames', d, 4)).toBeNull();
     expect(toMilliseconds(25, 'Frames', undefined, 1)).toBe(1000);
   });
+
+  it('does not rule out channels before the server reported its layout', () => {
+    const unknown = device('A', { channels: 0, channelFormats: '' });
+    expect(channelCount(unknown)).toBe(0);
+    expect(toMilliseconds(25, 'Frames', unknown, 2)).toBe(1000);
+    expect(channelCount(device('B', { channels: 2, channelFormats: '1080p5000,PAL' }))).toBe(2);
+    expect(channelCount(device('C', { channels: 0, channelFormats: '1080p5000,PAL,PAL' }))).toBe(3);
+  });
 });
 
 describe('keymap', () => {
@@ -177,5 +185,28 @@ describe('error text', () => {
     expect(errorText(new Error("Error invoking remote method 'backend:sendCompanion': Error: Companion: Page not found"))).toBe('Companion: Page not found');
     expect(errorText(new Error('Cannot reach Companion at 127.0.0.1:16759: connect ECONNREFUSED'))).toBe('Cannot reach Companion at 127.0.0.1:16759: connect ECONNREFUSED');
     expect(errorText('plain')).toBe('plain');
+  });
+});
+
+describe('custom row colors', () => {
+  it('converts between the color picker and the rundown file format', async () => {
+    const { hexToRowColor, rowColorToHex } = await import('../src/renderer/lib/colors');
+    expect(hexToRowColor('#FF0080')).toBe('rgba(255, 0, 128, 255)');
+    expect(rowColorToHex('rgba(255, 0, 128, 255)')).toBe('#ff0080');
+    expect(rowColorToHex('rgba(70, 130, 179, 128)')).toBe('#4682b3');
+    expect(rowColorToHex('SteelBlue')).toBe('#000000');
+  });
+});
+
+describe('separator rows', () => {
+  it('start without text and never show their type name', async () => {
+    const { createToolItem, rowTitle } = await import('../src/renderer/lib/definitions');
+    const { createItem } = await import('@soticaspar/core');
+    const fresh = createToolItem('SEPARATOR')!;
+    expect(fresh.label).toBe('');
+    const asNode = (label: string) => ({ ...createItem('SEPARATOR', { label }), id: 'x' }) as never;
+    expect(rowTitle(asNode(''))).toEqual({ label: '', type: '' });
+    expect(rowTitle(asNode('Separator'))).toEqual({ label: '', type: '' });
+    expect(rowTitle(asNode('Break'))).toEqual({ label: 'Break', type: '' });
   });
 });

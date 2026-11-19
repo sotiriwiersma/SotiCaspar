@@ -22,9 +22,9 @@ function parse(accelerator: string): Chord {
 
 const ALIASES: Readonly<Record<string, string>> = { ins: 'insert', del: 'delete' };
 
-const CHORDS = (Object.keys(COMMANDS) as CommandId[])
-  .filter((id) => COMMANDS[id].accelerator)
-  .map((id) => ({ id, chord: parse(COMMANDS[id].accelerator as string) }));
+const CHORDS = (Object.keys(COMMANDS) as CommandId[]).flatMap((id) =>
+  [COMMANDS[id].accelerator, ...(COMMANDS[id].alternates ?? [])].filter((a): a is string => !!a).map((a) => ({ id, chord: parse(a) }))
+);
 
 /** The command whose accelerator matches the key event, if any. */
 export function commandForKey(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>): CommandId | null {
@@ -36,7 +36,7 @@ export function commandForKey(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'me
   return null;
 }
 
-const isEditable = (target: EventTarget | null): boolean => {
+export const isEditable = (target: EventTarget | null): boolean => {
   const element = target as { tagName?: string; isContentEditable?: boolean } | null;
   return !!element && (element.isContentEditable === true || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName ?? ''));
 };
@@ -45,6 +45,7 @@ const isEditable = (target: EventTarget | null): boolean => {
  * Plain letter accelerators (Shift+C / Shift+V) and Insert must not fire while typing, while F-keys and Ctrl chords always do.
  */
 export function shouldHandle(command: CommandId, target: EventTarget | null): boolean {
+  if (COMMANDS[command].textFieldKeeps && isEditable(target)) return false;
   const accelerator = COMMANDS[command].accelerator ?? '';
   const isTypingKey = !accelerator.includes('CmdOrCtrl') && /^((Shift\+)?[A-Z]|Insert)$/.test(accelerator);
   return !(isTypingKey && isEditable(target));

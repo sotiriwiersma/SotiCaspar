@@ -177,8 +177,24 @@
     pending = fractionAt(event);
   }
 
+  /** Where the mouse is over the bar (0..1), for the time popup. */
+  let hover = $state<number | null>(null);
+  const hoverable = $derived(source === 'video' && video.length > 0 && video.fps > 0);
+  const hoverText = $derived(
+    hover === null || !hoverable ? '' : framesToTimecode(Math.round(hover * video.length * video.fps), video.fps, dropFrame)
+  );
+
   function onpointermove(event: PointerEvent): void {
-    if (dragging) pending = fractionAt(event);
+    hover = event.pointerType === 'touch' && !dragging ? null : fractionAt(event);
+    if (dragging) pending = hover;
+  }
+
+  /**
+   * Mouse use of the bar (clicks, drags, the Seek box) must not take keyboard focus away from the rundown, so the
+   * arrow keys keep stepping through it. Keyboard users can still Tab to the bar.
+   */
+  function keepFocus(event: MouseEvent): void {
+    if (event.button === 0) event.preventDefault();
   }
 
   function onpointerup(event: PointerEvent): void {
@@ -213,7 +229,8 @@
   }
 </script>
 
-<section class="countdown" class:idle={source === 'idle'} class:ending={remainingSeconds <= 10} class:urgent={remainingSeconds <= 5} aria-label="Countdown">
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<section onmousedown={keepFocus} class="countdown" class:idle={source === 'idle'} class:ending={remainingSeconds <= 10} class:urgent={remainingSeconds <= 5} aria-label="Countdown">
   <div class="head">
     <span class="title" title={title}>{#if source === 'video'}<span class="play-icon">{video.paused ? '❚❚' : '▶'}</span>{/if}{title}</span>
     {#if video.loop && source === 'video'}<span class="muted">Loop</span>{/if}
@@ -257,10 +274,16 @@
     {onpointermove}
     {onpointerup}
     onpointercancel={oncancel}
+    onpointerleave={() => (hover = null)}
     {onkeydown}
   >
     <div class="fill" class:paused={source === 'video' && video.paused} style:width="{fraction * 100}%"></div>
     {#if seekable}<div class="knob" style:left="{fraction * 100}%"></div>{/if}
+    {#if hover !== null && hoverText}
+      <div class="hover-line" style:left="{hover * 100}%"></div>
+      <!-- Shifted by its own position so it stays inside the bar at both ends. -->
+      <div class="hover-tip" style:left="{hover * 100}%" style:transform="translateX(-{hover * 100}%)">{hoverText}</div>
+    {/if}
   </div>
 </section>
 
@@ -432,5 +455,31 @@
 
   .track.dragging .knob {
     background: var(--accent);
+  }
+
+  .hover-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--text);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .hover-tip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    padding: 2px 6px;
+    background: var(--bg-darker);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    z-index: 10;
   }
 </style>

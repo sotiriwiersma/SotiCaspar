@@ -6,6 +6,7 @@ import { displayAccelerator } from '../lib/keymap';
 import { SEPARATOR, type MenuItem } from '../lib/menu';
 import { app } from './app.svelte';
 import { menuState, runCommand } from './commands';
+import { ui } from './ui.svelte';
 import { workspace } from './workspace.svelte';
 
 /** The context menu of the rundown list (RundownTreeWidget::setupMenus / customContextMenuRequested). */
@@ -20,7 +21,13 @@ export function buildRundownMenu(): MenuItem[] {
   // A repository rundown's structure belongs to the repository server (RundownTreeWidget::customContextMenuRequested).
   const locked = model.repository;
 
+  const undo = workspace.undoLabel;
+  const redo = workspace.redoLabel;
+
   return [
+    { label: undo ? `Undo ${undo}` : 'Undo', shortcut: displayAccelerator('edit.undo'), disabled: !workspace.canUndo, onselect: () => workspace.undo() },
+    { label: redo ? `Redo ${redo}` : 'Redo', shortcut: displayAccelerator('edit.redo'), disabled: !workspace.canRedo, onselect: () => workspace.redo() },
+    SEPARATOR,
     {
       label: 'Tools',
       disabled: locked,
@@ -52,6 +59,18 @@ export function buildRundownMenu(): MenuItem[] {
       disabled: locked || !hasSelection,
       children: [
         ...COLORIZE_PALETTE.map((color) => ({ label: color.name, checked: currentColor === color.value, onselect: () => workspace.colorize(color.value) })),
+        ...(app.settings.customColors.length > 0 ? [SEPARATOR] : []),
+        ...app.settings.customColors.map((color) => ({ label: color.name, checked: currentColor === color.value, onselect: () => workspace.colorize(color.value) })),
+        SEPARATOR,
+        { label: 'Custom Color...', onselect: () => ui.open('customColor') },
+        {
+          label: 'Remove Custom Color',
+          disabled: app.settings.customColors.length === 0,
+          children: app.settings.customColors.map((color) => ({
+            label: color.name,
+            onselect: () => void app.updateSettings({ customColors: app.settings.customColors.filter((c) => c.name !== color.name) })
+          }))
+        },
         SEPARATOR,
         { label: 'Reset', onselect: () => workspace.colorize(RESET_COLOR) }
       ]

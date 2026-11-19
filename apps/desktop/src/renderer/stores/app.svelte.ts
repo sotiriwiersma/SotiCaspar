@@ -65,6 +65,9 @@ class AppState {
 
     backend.on('device-status', (status) => {
       this.statuses = { ...this.statuses, [status.deviceName]: status };
+      // The server reported its channel layout (INFO): pick up the stored channels and formats.
+      const device = this.deviceByName(status.deviceName);
+      if (device && status.connected && status.channels > 0 && status.channels !== device.channels) void this.reloadDeviceConfigs();
     });
     backend.on('library-changed', () => void this.reloadLibrary());
   }
@@ -80,6 +83,10 @@ class AppState {
 
   async refreshLibrary(): Promise<void> {
     await backend.refreshLibrary();
+  }
+
+  private async reloadDeviceConfigs(): Promise<void> {
+    this.devices = await backend.listDevices();
   }
 
   async reloadDevices(): Promise<void> {

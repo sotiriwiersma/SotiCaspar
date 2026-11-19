@@ -288,6 +288,35 @@ class Workspace {
 
   // ---------------------------------------------------------------- editing
 
+  /** Undo / redo act on the active rundown; each tab keeps its own history. */
+  get canUndo(): boolean {
+    this.revision;
+    return this.active.model.canUndo;
+  }
+
+  get canRedo(): boolean {
+    this.revision;
+    return this.active.model.canRedo;
+  }
+
+  get undoLabel(): string | null {
+    this.revision;
+    return this.active.model.undoLabel;
+  }
+
+  get redoLabel(): string | null {
+    this.revision;
+    return this.active.model.redoLabel;
+  }
+
+  undo(): void {
+    this.active.model.undo();
+  }
+
+  redo(): void {
+    this.active.model.redo();
+  }
+
   async copy(): Promise<void> {
     const xml = this.active.model.copyXml();
     if (xml) await copyText(xml);
@@ -295,7 +324,7 @@ class Workspace {
 
   async cut(): Promise<void> {
     await this.copy();
-    this.active.model.removeSelected();
+    this.active.model.removeSelected('Cut');
   }
 
   async paste(): Promise<void> {
@@ -330,7 +359,7 @@ class Workspace {
   colorize(color: string): void {
     const { model } = this.active;
     if (model.repository) return;
-    model.updateNodes(model.selected, (node) => patchProps(node, { color }));
+    model.updateNodes(model.selected, (node) => patchProps(node, { color }), { label: 'Colorize' });
   }
 
   setUsed(used: boolean): void {
@@ -384,7 +413,9 @@ class Workspace {
   /** Inserts a preset (rundown XML) after the current item and moves the selection below it. */
   addPreset(xml: string): void {
     const { model } = this.active;
-    if (model.paste(xml) > 0) model.stepCurrent(1);
+    model.edit('Add Preset', () => {
+      if (model.paste(xml) > 0) model.stepCurrent(1);
+    });
   }
 
   async saveSelectionAsPreset(): Promise<void> {

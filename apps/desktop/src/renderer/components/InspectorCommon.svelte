@@ -1,8 +1,9 @@
 <script lang="ts">
   import { commonFields } from '../lib/common';
-  import { channelFormats, channelFps } from '../engine/devices';
+  import { channelCount as countChannels, channelFps } from '../engine/devices';
   import { isGroupNode, type TreeNode } from '../engine/tree';
-  import { applyCommonProp, applyCurrentProp, applyItemField } from '../stores/inspector';
+  import { applyCommonProp, applyCurrentProp, applyItemField, isMixedCommonValue } from '../stores/inspector';
+  import { workspace } from '../stores/workspace.svelte';
   import { app } from '../stores/app.svelte';
   import TimeInput from './TimeInput.svelte';
 
@@ -15,7 +16,8 @@
   const common = $derived(commonFields(node.type));
   const device = $derived(isGroupNode(node) ? undefined : app.deviceByName(node.deviceName));
   const deviceName = $derived(isGroupNode(node) ? '' : node.deviceName);
-  const channelCount = $derived(device ? Math.max(1, channelFormats(device).length) : 1);
+  // Up to 99 while the server has not reported its channels (or the item has no known server).
+  const channelCount = $derived(countChannels(device) || 99);
   const lockedChannel = $derived(device && device.lockedChannel > 0 && device.lockedChannel <= channelCount ? device.lockedChannel : 0);
   const timecode = $derived(app.settings.delayType === 'Timecode');
   const unit = $derived(app.settings.delayType === 'Milliseconds' ? 'ms' : 'frm');
@@ -23,6 +25,22 @@
   const fps = $derived(channelFps(device, Number(node.props.channel) || 1));
   const allowRemote = $derived(node.props.allowremotetriggering === true || node.props.allowremotetriggering === 'true');
   const allowGpi = $derived(node.props.allowgpi === true || node.props.allowgpi === 'true');
+  // Fields whose value differs between the selected items: checkboxes show as indeterminate, other fields empty
+  // with a hint. (`workspace.selected` is read first: it makes them follow every change of the rundown.)
+  const multi = $derived(workspace.selected.size > 1);
+  const mixedDevice = $derived(multi && isMixedCommonValue('device', '@deviceName'));
+  const mixedChannel = $derived(multi && isMixedCommonValue('channel', 'channel'));
+  const mixedLayer = $derived(multi && isMixedCommonValue('layer', 'videolayer'));
+  const mixedDelay = $derived(multi && isMixedCommonValue('delay', 'delay'));
+  const mixedDuration = $derived(multi && isMixedCommonValue('duration', 'duration'));
+  const mixedGpi = $derived(multi && isMixedCommonValue('gpi', 'allowgpi', true));
+  const mixedRemote = $derived(multi && isMixedCommonValue('remote', 'allowremotetriggering', true));
+  const MIXED = 'Multiple values';
+  const mixedTitle = 'The selected items have different values';
+  const MIXED_OPTION = '\u0000mixed';
+  const indeterminate = (mixed: boolean) => (box: HTMLInputElement) => {
+    box.indeterminate = mixed;
+  };
   const knownDevice = $derived(app.targetDevices.some((d) => d.name === deviceName));
 
   const num = (event: Event, min: number, max?: number): number | null => {
@@ -40,8 +58,9 @@
 <div class="common">
   {#if common.device}
     <div class="field">
-      <label for="insp-device">Server</label>
-      <select id="insp-device" class:invalid={deviceName === ''} value={deviceName} onchange={(e) => applyItemField('@deviceName', e.currentTarget.value)}>
+      <label for="insp-device" class:mixed={mixedDevice} title={mixedDevice ? mixedTitle : undefined}>Server</label>
+      <select id="insp-device" class:invalid={deviceName === '' && !mixedDevice} value={mixedDevice ? MIXED_OPTION : deviceName} onchange={(e) => applyItemField('@deviceName', e.currentTarget.value)}>
+        {#if mixedDevice}<option value={MIXED_OPTION} disabled>{MIXED}</option>{/if}
         <option value=""></option>
         {#each app.targetDevices as d (d.name)}<option value={d.name}>{d.name}</option>{/each}
         {#if deviceName !== '' && !knownDevice}<option value={deviceName}>{deviceName}</option>{/if}
@@ -50,24 +69,32 @@
   {/if}
   {#if common.channel}
     <div class="field">
-      <label for="insp-channel">Channel</label>
-      <input id="insp-channel" type="number" min="1" max={channelCount} disabled={lockedChannel > 0} value={lockedChannel > 0 ? lockedChannel : Number(node.props.channel)} oninput={(e) => setNumber(e, 'channel', 'channel', 1, channelCount)} />
+      <label for="insp-channel" class:mixed={mixedChannel && lockedChannel === 0} title={mixedChannel && lockedChannel === 0 ? mixedTitle : undefined}>Channel</label>
+      <input
+        id="insp-channel"
+        type="number"
+        min="1"
+        max={channelCount}
+        disabled={lockedChannel > 0}
+        value={lockedChannel > 0 ? lockedChannel : mixedChannel ? '' : Number(node.props.channel)}
+        placeholder={mixedChannel ? MIXED : undefined}
+       oninput={(e) => setNumber(e, 'channel', 'channel', 1, channelCount)} />
     </div>
   {/if}
   {#if common.layer}
     <div class="field">
-      <label for="insp-layer">Video layer</label>
-      <input id="insp-layer" type="number" min="0" max="99999" value={Number(node.props.videolayer)} oninput={(e) => setNumber(e, 'videolayer', 'layer', 0, 99999)} />
+      <label for="insp-layer" class:mixed={mixedLayer} title={mixedLayer ? mixedTitle : undefined}>Video layer</label>
+      <input id="insp-layer" type="number" min="0" max="99999" value={mixedLayer ? '' : Number(node.props.videolayer)} placeholder={mixedLayer ? MIXED : undefined} oninput={(e) => setNumber(e, 'videolayer', 'layer', 0, 99999)} />
     </div>
   {/if}
   {#if common.delay}
     <div class="field">
-      <label for="insp-delay">Delay</label>
+      <label for="insp-delay" class:mixed={mixedDelay} title={mixedDelay ? mixedTitle : undefined}>Delay</label>
       <span class="with-unit">
         {#if timecode}
-          <TimeInput id="insp-delay" value={Number(node.props.delay)} {fps} dropFrame={app.settings.useDropFrameNotation} min={-1} onchange={(v) => applyCommonProp('delay', 'delay', v)} />
+          <TimeInput id="insp-delay" value={Number(node.props.delay)} mixed={mixedDelay} {fps} dropFrame={app.settings.useDropFrameNotation} min={-1} onchange={(v) => applyCommonProp('delay', 'delay', v)} />
         {:else}
-          <input id="insp-delay" type="number" min="-1" value={Number(node.props.delay)} oninput={(e) => setNumber(e, 'delay', 'delay', -1)} />
+          <input id="insp-delay" type="number" min="-1" value={mixedDelay ? '' : Number(node.props.delay)} placeholder={mixedDelay ? MIXED : undefined} oninput={(e) => setNumber(e, 'delay', 'delay', -1)} />
           <span class="muted">{unit}</span>
         {/if}
       </span>
@@ -75,22 +102,22 @@
   {/if}
   {#if common.duration}
     <div class="field">
-      <label for="insp-duration">Duration</label>
+      <label for="insp-duration" class:mixed={mixedDuration} title={mixedDuration ? mixedTitle : undefined}>Duration</label>
       <span class="with-unit">
         {#if timecode}
-          <TimeInput id="insp-duration" value={Number(node.props.duration)} {fps} dropFrame={app.settings.useDropFrameNotation} min={0} max={99999} onchange={(v) => applyCommonProp('duration', 'duration', v)} />
+          <TimeInput id="insp-duration" value={Number(node.props.duration)} mixed={mixedDuration} {fps} dropFrame={app.settings.useDropFrameNotation} min={0} max={99999} onchange={(v) => applyCommonProp('duration', 'duration', v)} />
         {:else}
-          <input id="insp-duration" type="number" min="0" max="99999" value={Number(node.props.duration)} oninput={(e) => setNumber(e, 'duration', 'duration', 0, 99999)} />
+          <input id="insp-duration" type="number" min="0" max="99999" value={mixedDuration ? '' : Number(node.props.duration)} placeholder={mixedDuration ? MIXED : undefined} oninput={(e) => setNumber(e, 'duration', 'duration', 0, 99999)} />
           <span class="muted">{unit}</span>
         {/if}
       </span>
     </div>
   {/if}
   {#if common.gpi}
-    <label class="check"><input type="checkbox" checked={allowGpi} onchange={(e) => applyCommonProp('gpi', 'allowgpi', e.currentTarget.checked)} /> Allow GPI</label>
+    <label class="check"><input type="checkbox" checked={allowGpi} title={mixedGpi ? mixedTitle : undefined} {@attach indeterminate(mixedGpi)} onchange={(e) => applyCommonProp('gpi', 'allowgpi', e.currentTarget.checked)} /> Allow GPI</label>
   {/if}
   {#if common.remote}
-    <label class="check"><input type="checkbox" checked={allowRemote} onchange={(e) => applyCommonProp('remote', 'allowremotetriggering', e.currentTarget.checked)} /> Allow Remote Triggering</label>
+    <label class="check"><input type="checkbox" checked={allowRemote} title={mixedRemote ? mixedTitle : undefined} {@attach indeterminate(mixedRemote)} onchange={(e) => applyCommonProp('remote', 'allowremotetriggering', e.currentTarget.checked)} /> Allow Remote Triggering</label>
     <div class="field">
       <label for="insp-uid">UID</label>
       <input id="insp-uid" type="text" disabled={!allowRemote} value={String(node.props.remotetriggerid ?? '')} oninput={(e) => applyCurrentProp('remotetriggerid', e.currentTarget.value)} />
@@ -109,6 +136,10 @@
 
   label {
     color: var(--text-dim);
+  }
+
+  label.mixed {
+    font-style: italic;
   }
 
   .check {

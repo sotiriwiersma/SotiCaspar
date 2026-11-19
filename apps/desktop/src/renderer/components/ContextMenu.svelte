@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import type { MenuItem } from '../lib/menu';
   import ContextMenu from './ContextMenu.svelte';
 
@@ -25,6 +25,15 @@
   $effect(() => {
     left = x;
     top = y;
+  });
+
+  /** Where focus was before the menu took it (e.g. the rundown), given back when the menu closes. */
+  const previousFocus = document.activeElement as HTMLElement | null;
+  onDestroy(() => {
+    if (nested) return;
+    const active = document.activeElement;
+    // Only when focus is left nowhere useful: a dialog opened from the menu keeps its focus.
+    if (previousFocus?.isConnected && (!active || active === document.body || menu?.contains(active))) previousFocus.focus();
   });
 
   onMount(async () => {

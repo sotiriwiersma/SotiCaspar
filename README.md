@@ -21,6 +21,21 @@ anywhere. Settings are kept in `%APPDATA%\SotiCaspar`. Requires CasparCG Server 
 
 ## What's new
 
+**0.1.2**
+
+- **Undo and redo** for every rundown edit: adding, pasting, duplicating, removing, moving, grouping and inspector
+  changes. Ctrl+Z undoes, Ctrl+Y or Ctrl+Shift+Z redoes; also in the Edit menu and the rundown's right-click menu. Typing
+  in one field is one undo step. Each rundown tab has its own history.
+- **Editing several items at once** in the inspector: fields where the selected items differ show *Multiple values*
+  (checkboxes show as half-checked), and a change applies to all of them.
+- **Custom colors** in *Colorize Item*: pick your own color with *Custom Color...* and give it a name.
+- **Countdown bar:** hovering over the bar shows the time at that point. Clicking or dragging the bar no longer takes
+  the arrow keys away from the rundown.
+- A red glow around the rundown shows when it does not have keyboard focus (so its keys do not reach it).
+- Dragging the panel dividers no longer gets stuck to the mouse.
+- A new install starts with a server on this PC (`Localhost`, 127.0.0.1). Channels can be picked before the server has
+  reported its channel layout.
+
 **0.1.1**
 
 - Companion Button items now use Companion's **TCP/UDP remote control** instead of its HTTP API. Where Companion is

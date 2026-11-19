@@ -18,7 +18,13 @@ export function resolveTargets(devices: readonly DeviceConfig[], deviceName: str
 
 /** The video format name of each channel of a device, as reported in `DeviceConfig.channelFormats`. */
 export function channelFormats(device: DeviceConfig | undefined): string[] {
-  return device ? device.channelFormats.split(',').map((f) => f.trim()) : [];
+  const formats = device?.channelFormats.trim() ?? '';
+  return formats === '' ? [] : formats.split(',').map((f) => f.trim());
+}
+
+/** Number of channels of a device, 0 when the server has not reported its layout yet. */
+export function channelCount(device: DeviceConfig | undefined): number {
+  return device ? Math.max(device.channels, channelFormats(device).length) : 0;
 }
 
 /** The frame rate of a channel (25 when the device or its format is unknown). */
@@ -34,7 +40,8 @@ export function channelFps(device: DeviceConfig | undefined, channel: number): n
 export function toMilliseconds(value: number, delayType: AppSettings['delayType'], device: DeviceConfig | undefined, channel: number): number | null {
   if (delayType === 'Milliseconds') return value;
   const formats = channelFormats(device);
-  if (device && channel > formats.length) return null;
+  // Only a reported layout rules out a channel: before INFO arrived the default frame rate is used.
+  if (device && formats.length > 0 && channel > formats.length) return null;
   // Rounded to the nearest millisecond: with the exact NTSC rates a truncation can land one millisecond early.
   return Math.round((value * 1000) / framesPerSecond(formats[channel - 1] ?? ''));
 }

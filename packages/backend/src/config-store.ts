@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { DEFAULT_SETTINGS } from '@soticaspar/core';
-import type { AppSettings, ClipDefaults, DeviceConfig, OscOutputConfig, Preset } from '@soticaspar/core';
+import type { AppSettings, ClipDefaults, CustomColor, DeviceConfig, OscOutputConfig, Preset } from '@soticaspar/core';
 import type { LogFn } from './events';
 import { JsonFile } from './json-file';
 
@@ -20,6 +20,9 @@ const DEFAULT_DEVICE: DeviceConfig = {
   lockedChannel: 0,
   version: ''
 };
+
+/** The server a new install starts with: a CasparCG server on this PC. */
+export const LOCALHOST_DEVICE: DeviceConfig = { ...DEFAULT_DEVICE, name: 'Localhost', address: '127.0.0.1' };
 
 const DEFAULT_OSC_OUTPUT: OscOutputConfig = { name: '', address: '', port: 0, description: '' };
 
@@ -81,8 +84,17 @@ function sanitizeClipDefaults(raw: unknown): ClipDefaults {
   return result;
 }
 
+/** Named colors with a non-empty name and value, unique by name. */
+function sanitizeCustomColors(raw: unknown): CustomColor[] {
+  return sanitizeList(raw, { name: '', value: '' }, (c) => c.name.trim() !== '' && c.value.trim() !== '');
+}
+
 export function sanitizeSettings(raw: unknown): AppSettings {
-  const settings = { ...pickKnown(raw, DEFAULT_SETTINGS), clipDefaults: sanitizeClipDefaults(isRecord(raw) ? raw.clipDefaults : undefined) };
+  const settings = {
+    ...pickKnown(raw, DEFAULT_SETTINGS),
+    clipDefaults: sanitizeClipDefaults(isRecord(raw) ? raw.clipDefaults : undefined),
+    customColors: sanitizeCustomColors(isRecord(raw) ? raw.customColors : undefined)
+  };
   // Values the UI offers as a choice or a range: anything else falls back to the default.
   if (settings.companionProtocol !== 'TCP' && settings.companionProtocol !== 'UDP') settings.companionProtocol = DEFAULT_SETTINGS.companionProtocol;
   if (!Number.isInteger(settings.companionPort) || settings.companionPort < 1 || settings.companionPort > 65535) settings.companionPort = DEFAULT_SETTINGS.companionPort;
@@ -110,10 +122,16 @@ export class ConfigStore {
   }
 
   async load(): Promise<void> {
+    // A new install has never written the device list: it starts with a server on this PC.
+    const newInstall = !(await this.files.devices.exists());
     const [settings, devices, outputs, presets, recent] = await Promise.all(Object.values(this.files).map((file) => file.read()));
 
     this.settingsData = sanitizeSettings(settings);
     this.deviceData = sanitizeList(devices, DEFAULT_DEVICE, (d) => d.name !== '' && d.address !== '');
+    if (newInstall) {
+      this.deviceData = [{ ...LOCALHOST_DEVICE }];
+      await this.files.devices.write(this.deviceData);
+    }
     this.outputData = sanitizeList(outputs, DEFAULT_OSC_OUTPUT, (o) => o.name !== '');
     this.presetData = sanitizeList(presets, { name: '', value: '' }, (p) => p.name !== '');
     this.recentData = Array.isArray(recent) ? recent.filter((p): p is string => typeof p === 'string') : [];

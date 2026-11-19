@@ -11,6 +11,7 @@
   import AppMenuBar from './components/AppMenuBar.svelte';
   import AudioLevelsPanel from './components/AudioLevelsPanel.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
+  import CustomColorDialog from './components/CustomColorDialog.svelte';
   import CountdownBar from './components/CountdownBar.svelte';
   import HelpDialog from './components/HelpDialog.svelte';
   import InspectorPanel from './components/InspectorPanel.svelte';
@@ -114,6 +115,7 @@
 {#if ui.dialog === 'about'}<AboutDialog />{/if}
 {#if ui.dialog === 'help'}<HelpDialog />{/if}
 {#if ui.dialog === 'openUrl'}<OpenRepositoryDialog />{/if}
+{#if ui.dialog === 'customColor'}<CustomColorDialog />{/if}
 <ConfirmDialog />
 <PromptDialog />
 

@@ -35,6 +35,7 @@ import {
   type TreeItem,
   type TreeNode
 } from './tree';
+import { UndoHistory } from './history';
 
 export type SelectMode = 'single' | 'toggle' | 'range';
 
@@ -51,6 +52,44 @@ function newGroup(): TreeGroup {
   const definition = getItemDefinition('GROUP');
   const props: Props = definition ? defaultProps(definition) : { notes: '', autostep: false, autoplay: false };
   return { id: newId(), type: 'GROUP', label: 'Group', expanded: true, props, items: [] };
+}
+
+/** Everything an undo step puts back: the content and the selection that went with it. */
+export interface RundownSnapshot {
+  readonly nodes: TreeNode[];
+  readonly allowRemote: boolean;
+  readonly selected: ReadonlySet<string>;
+  readonly current: string | null;
+  readonly anchor: string | null;
+}
+
+export interface EditOptions {
+  /** Shown as "Undo <label>". */
+  label?: string;
+  /** Steps with the same key in quick succession are one undo step (typing in a field). */
+  merge?: string;
+}
+
+/**
+ * Restored content keeps today's expanded/collapsed state of each group: folding is a view choice, not an edit, so
+ * undo should not open or close groups that the operator has since folded.
+ */
+function keepExpansion(restored: TreeNode[], now: readonly TreeNode[]): TreeNode[] {
+  const expanded = new Map<string, boolean>();
+  for (const node of walkNodes(now)) if (isGroupNode(node)) expanded.set(node.id, node.expanded);
+  const visit = (nodes: TreeNode[]): TreeNode[] => {
+    let changed = false;
+    const out = nodes.map((node) => {
+      if (!isGroupNode(node)) return node;
+      const items = visit(node.items as TreeNode[]);
+      const want = expanded.get(node.id) ?? node.expanded;
+      if (items === node.items && want === node.expanded) return node;
+      changed = true;
+      return { ...node, expanded: want, items } as TreeGroup;
+    });
+    return changed ? out : nodes;
+  };
+  return visit(restored);
 }
 
 const storyIdOf = (node: TreeNode): string => String(node.props.storyid ?? '');
@@ -105,6 +144,9 @@ export class RundownModel {
   private savedXml = '';
   private dirtyCache: { nodes: TreeNode[]; allowRemote: boolean; value: boolean } | null = null;
   private readonly listeners = new Set<() => void>();
+  private readonly history = new UndoHistory<RundownSnapshot>();
+  /** Depth of nested `edit` calls: only the outermost one records an undo step. */
+  private editDepth = 0;
 
   constructor() {
     this.savedXml = this.toXml();
@@ -145,6 +187,7 @@ export class RundownModel {
     this.current = null;
     this.anchor = null;
     this.savedXml = this.toXml();
+    this.history.clear();
     if (this.nodes.length > 0) this.select(this.nodes[0].id, 'single');
     else this.emit();
   }
@@ -172,10 +215,79 @@ export class RundownModel {
     return topmostSelected(this.nodes, this.selected);
   }
 
+  // ---------------------------------------------------------------- undo / redo
+
+  /**
+   * Runs `body` as one undoable step. Every content change of the model goes through here, so a new editing
+   * method only has to wrap its body to be undoable. Nested calls (duplicate → paste, a workspace action made of
+   * several model calls) fold into the outermost step. Nothing is recorded when the content did not change.
+   */
+  edit<T>(label: string, body: () => T, options: Omit<EditOptions, 'label'> = {}): T {
+    if (this.editDepth > 0) return body();
+    const before = this.snapshot();
+    this.editDepth++;
+    try {
+      return body();
+    } finally {
+      this.editDepth--;
+      if (this.nodes !== before.nodes || this.allowRemote !== before.allowRemote) {
+        this.history.record(label, before, options.merge);
+        // Listeners re-read canUndo / undoLabel.
+        this.emit();
+      }
+    }
+  }
+
+  get canUndo(): boolean {
+    return !this.repository && this.history.canUndo;
+  }
+
+  get canRedo(): boolean {
+    return !this.repository && this.history.canRedo;
+  }
+
+  get undoLabel(): string | null {
+    return this.history.undoLabel;
+  }
+
+  get redoLabel(): string | null {
+    return this.history.redoLabel;
+  }
+
+  undo(): boolean {
+    if (this.repository || this.editDepth > 0) return false;
+    const state = this.history.undo(this.snapshot());
+    if (state) this.restore(state);
+    return state !== null;
+  }
+
+  redo(): boolean {
+    if (this.repository || this.editDepth > 0) return false;
+    const state = this.history.redo(this.snapshot());
+    if (state) this.restore(state);
+    return state !== null;
+  }
+
+  private snapshot(): RundownSnapshot {
+    return { nodes: this.nodes, allowRemote: this.allowRemote, selected: this.selected, current: this.current, anchor: this.anchor };
+  }
+
+  private restore(state: RundownSnapshot): void {
+    this.nodes = keepExpansion(state.nodes, this.nodes);
+    this.allowRemote = state.allowRemote;
+    this.selected = state.selected;
+    this.current = state.current;
+    this.anchor = state.anchor;
+    this.dropMissingSelection();
+    this.emit();
+  }
+
   // ---------------------------------------------------------------- selection
 
   select(id: string, mode: SelectMode): void {
     if (!locate(this.nodes, id)) return;
+    // Typing in the inspector after picking another row is a new undo step.
+    this.history.seal();
     if (mode === 'toggle') {
       const next = new Set(this.selected);
       if (next.has(id)) next.delete(id);
@@ -229,8 +341,10 @@ export class RundownModel {
     if (this.repository) return;
     const nodes = assignIds(items);
     if (nodes.length === 0) return;
-    this.nodes = insertAt(this.nodes, anchorId, position, nodes);
-    this.selectOnly(nodes[nodes.length - 1].id);
+    this.edit(nodes.length === 1 ? 'Add Item' : 'Add Items', () => {
+      this.nodes = insertAt(this.nodes, anchorId, position, nodes);
+      this.selectOnly(nodes[nodes.length - 1].id);
+    });
   }
 
   /** Inserts rundown XML (clipboard or preset) at the anchor. Returns the number of inserted nodes. */
@@ -244,8 +358,10 @@ export class RundownModel {
     }
     const nodes = assignIds(parsed.items);
     if (nodes.length === 0) return 0;
-    this.nodes = insertAt(this.nodes, anchorId, position, nodes);
-    this.emit();
+    this.edit('Paste', () => {
+      this.nodes = insertAt(this.nodes, anchorId, position, nodes);
+      this.emit();
+    });
     return nodes.length;
   }
 
@@ -256,7 +372,7 @@ export class RundownModel {
 
   duplicate(): void {
     const xml = this.copyXml();
-    if (xml) this.paste(xml);
+    if (xml) this.edit('Duplicate', () => this.paste(xml));
   }
 
   /** Applies copied item properties to every selected node of the same type. */
@@ -279,24 +395,28 @@ export class RundownModel {
       }
     }
     if (changed) {
-      this.nodes = nodes;
-      this.emit();
+      this.edit('Paste Properties', () => {
+        this.nodes = nodes;
+        this.emit();
+      });
     }
     return changed;
   }
 
-  removeSelected(): void {
+  removeSelected(label = 'Remove'): void {
     if (this.repository || this.selected.size === 0) return;
-    const rows = flatten(this.nodes);
-    const firstRemoved = rows.findIndex((r) => this.selected.has(r.id));
-    this.nodes = removeNodes(this.nodes, this.selected);
-    const after = flatten(this.nodes);
-    const next = after[Math.min(firstRemoved, after.length - 1)];
-    this.selected = new Set();
-    this.current = null;
-    this.anchor = null;
-    if (next) this.select(next.id, 'single');
-    else this.emit();
+    this.edit(label, () => {
+      const rows = flatten(this.nodes);
+      const firstRemoved = rows.findIndex((r) => this.selected.has(r.id));
+      this.nodes = removeNodes(this.nodes, this.selected);
+      const after = flatten(this.nodes);
+      const next = after[Math.min(firstRemoved, after.length - 1)];
+      this.selected = new Set();
+      this.current = null;
+      this.anchor = null;
+      if (next) this.select(next.id, 'single');
+      else this.emit();
+    });
   }
 
   group(): boolean {
@@ -304,8 +424,10 @@ export class RundownModel {
     const group = newGroup();
     const result = groupNodes(this.nodes, this.selected, group);
     if (!result) return false;
-    this.nodes = result;
-    this.selectOnly(group.id);
+    this.edit('Group', () => {
+      this.nodes = result;
+      this.selectOnly(group.id);
+    });
     return true;
   }
 
@@ -317,11 +439,13 @@ export class RundownModel {
     if (this.repository) return false;
     const result = ungroupNodes(this.nodes, this.selected);
     if (!result) return false;
-    this.nodes = result.nodes;
-    this.selected = new Set(result.released);
-    this.current = result.released[result.released.length - 1] ?? null;
-    this.anchor = this.current;
-    this.emit();
+    this.edit('Ungroup', () => {
+      this.nodes = result.nodes;
+      this.selected = new Set(result.released);
+      this.current = result.released[result.released.length - 1] ?? null;
+      this.anchor = this.current;
+      this.emit();
+    });
     return true;
   }
 
@@ -336,8 +460,10 @@ export class RundownModel {
     else if (action === 'into') next = moveIntoGroup(this.nodes, id);
     else next = moveOutOfGroup(this.nodes, id);
     if (next === this.nodes) return;
-    this.nodes = next;
-    this.selectOnly(id);
+    this.edit(action === 'into' ? 'Move into Group' : action === 'out' ? 'Move out of Group' : 'Move', () => {
+      this.nodes = next;
+      this.selectOnly(id);
+    });
   }
 
   /** Drag and drop reordering of the selected nodes (or `ids`). */
@@ -345,29 +471,36 @@ export class RundownModel {
     if (this.repository) return false;
     const next = moveTo(this.nodes, ids, anchorId, position);
     if (!next) return false;
-    this.nodes = next;
-    this.emit();
+    this.edit('Move', () => {
+      this.nodes = next;
+      this.emit();
+    });
     return true;
   }
 
+  /** Folding a group is a view change: not an undo step (undo also leaves today's folding alone). */
   setExpanded(id: string, expanded: boolean): void {
     this.nodes = setExpanded(this.nodes, id, expanded);
     this.emit();
   }
 
   /** Applies `update` to the given nodes (the inspector, colorize ...). */
-  updateNodes(ids: Iterable<string>, update: (node: TreeNode) => TreeNode): void {
+  updateNodes(ids: Iterable<string>, update: (node: TreeNode) => TreeNode, options: EditOptions = {}): void {
     let nodes = this.nodes;
     for (const id of ids) nodes = updateNode(nodes, id, update);
     if (nodes === this.nodes) return;
-    this.nodes = nodes;
-    this.emit();
+    this.edit(options.label ?? 'Edit', () => {
+      this.nodes = nodes;
+      this.emit();
+    }, { merge: options.merge });
   }
 
   setAllowRemote(allow: boolean): void {
     if (this.allowRemote === allow) return;
-    this.allowRemote = allow;
-    this.emit();
+    this.edit(allow ? 'Allow Remote Triggering' : 'Disallow Remote Triggering', () => {
+      this.allowRemote = allow;
+      this.emit();
+    });
   }
 
   setCompact(compact: boolean): void {
@@ -398,6 +531,8 @@ export class RundownModel {
       else nodes = change.type === 'ADD' ? addStory(nodes, change.storyId, change.data) : removeStory(nodes, change.storyId);
     }
     this.pendingChanges = waiting;
+    // The repository server owns this content: its changes are not undo steps, and older steps would revert them.
+    if (nodes !== this.nodes) this.history.clear();
     this.nodes = nodes;
     this.dropMissingSelection();
     this.emit();

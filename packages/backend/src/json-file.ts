@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { LogFn } from './events';
 
@@ -40,6 +40,14 @@ export class JsonFile {
     private readonly path: string,
     private readonly log: LogFn
   ) {}
+
+  /** True when the file is on disk (also when it is corrupt). */
+  async exists(): Promise<boolean> {
+    return access(this.path).then(
+      () => true,
+      () => false
+    );
+  }
 
   async read(): Promise<unknown> {
     let text: string;

@@ -10,6 +10,8 @@ export type CommandId =
   | 'file.save'
   | 'file.saveAs'
   | 'file.quit'
+  | 'edit.undo'
+  | 'edit.redo'
   | 'edit.settings'
   | 'view.fullscreen'
   | 'view.compact'
@@ -47,6 +49,13 @@ export interface CommandInfo {
   label: string;
   /** Electron accelerator syntax. */
   accelerator?: string;
+  /** More keys for the same command, handled by the renderer only (a native menu entry shows one accelerator). */
+  alternates?: string[];
+  /**
+   * In a text field the key belongs to the field (Ctrl+Z undoes typing there, not a rundown edit). Ctrl chords
+   * otherwise always fire, also from text fields.
+   */
+  textFieldKeeps?: boolean;
   checkbox?: boolean;
 }
 
@@ -60,6 +69,8 @@ export const COMMANDS: Record<CommandId, CommandInfo> = {
   'file.save': { label: 'Save', accelerator: 'CmdOrCtrl+S' },
   'file.saveAs': { label: 'Save As...', accelerator: 'CmdOrCtrl+Shift+S' },
   'file.quit': { label: 'Quit' },
+  'edit.undo': { label: 'Undo', accelerator: 'CmdOrCtrl+Z', textFieldKeeps: true },
+  'edit.redo': { label: 'Redo', accelerator: 'CmdOrCtrl+Y', alternates: ['CmdOrCtrl+Shift+Z'], textFieldKeeps: true },
   'edit.settings': { label: 'Settings...' },
   'view.fullscreen': { label: 'Toggle Fullscreen', accelerator: 'CmdOrCtrl+F' },
   'view.compact': { label: 'Compact View', checkbox: true },
@@ -115,7 +126,7 @@ export const MENU: readonly { label: string; entries: readonly MenuEntry[] }[] =
       c('file.quit')
     ]
   },
-  { label: 'Edit', entries: [c('edit.settings')] },
+  { label: 'Edit', entries: [c('edit.undo'), c('edit.redo'), SEP, c('edit.settings')] },
   {
     label: 'View',
     entries: [

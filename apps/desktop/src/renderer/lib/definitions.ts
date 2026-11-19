@@ -86,9 +86,20 @@ export function applyItemDefaults(item: RundownItem, settings: Pick<AppSettings,
   return { ...item, props: { ...item.props, ...freeze, ...defaults } };
 }
 
+export const SEPARATOR_TYPE = 'SEPARATOR';
+
+/** Row text: separators only show a label of their own, never their type name ("Separator"). */
+export function rowTitle(node: TreeNode): { label: string; type: string } {
+  const label = rowLabel(node);
+  const title = typeTitle(node.type);
+  if (node.type === SEPARATOR_TYPE) return { label: label === title ? '' : label, type: '' };
+  return { label, type: title !== label ? title : '' };
+}
+
 export function createToolItem(type: string): RundownItem | null {
   const definition = getItemDefinition(type);
-  return definition ? createItem(type, { label: definition.title }) : null;
+  // A separator starts without text: it is a colored bar until the user gives it a label.
+  return definition ? createItem(type, { label: type === SEPARATOR_TYPE ? '' : definition.title }) : null;
 }
 
 /** Item for a library entry (double click or drag from the Audio/Image/Template/Video tabs). */

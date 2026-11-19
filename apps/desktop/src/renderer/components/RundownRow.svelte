@@ -3,7 +3,7 @@
   import { isGroupNode, type FlatRow } from '../engine/tree';
   import { ACTIVE_COLOR, isTransparent } from '../lib/colors';
   import { commonFields } from '../lib/common';
-  import { COMPACT_ROW_HEIGHT, ROW_HEIGHT, LIBRARY_TYPE_OF_ITEM, rowLabel, typeColor, typeTitle } from '../lib/definitions';
+  import { COMPACT_ROW_HEIGHT, ROW_HEIGHT, LIBRARY_TYPE_OF_ITEM, rowTitle, typeColor } from '../lib/definitions';
   import { channelFps } from '../engine/devices';
   import { framesToTimecode, fromMilliseconds, libraryTimecode } from '../lib/timecode';
   import { app } from '../stores/app.svelte';
@@ -36,6 +36,7 @@
   });
 
   const common = $derived(commonFields(node.type));
+  const title = $derived(rowTitle(node));
   const flag = (key: string): boolean => p[key] === true || p[key] === 'true';
   const device = $derived(isGroupNode(node) ? '' : node.deviceName);
   const entry = $derived.by(() => {
@@ -109,8 +110,8 @@
 
   <div class="body">
     <div class="title">
-      <span class="label">{rowLabel(node)}</span>
-      {#if typeTitle(node.type) !== rowLabel(node)}<span class="type muted">{typeTitle(node.type)}</span>{/if}
+      <span class="label">{title.label}</span>
+      {#if title.type !== ''}<span class="type muted">{title.type}</span>{/if}
     </div>
     {#if !compact}
       <div class="meta">

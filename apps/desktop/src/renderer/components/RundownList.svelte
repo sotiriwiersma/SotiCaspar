@@ -254,6 +254,25 @@
     box-shadow: inset 0 0 0 1px var(--accent);
   }
 
+  /* A glowing "LED" edge while the rundown does not have keyboard focus, so its keys do not reach it. */
+  .list::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 64, 64, 0.9),
+      inset 0 0 6px 1px rgba(255, 64, 64, 0.45);
+    pointer-events: none;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .list:not(:focus-within)::after {
+    opacity: 1;
+  }
+
   .list.empty {
     border: 1px solid var(--danger);
   }

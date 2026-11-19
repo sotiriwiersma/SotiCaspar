@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { channelFormats } from '../engine/devices';
+  import { channelCount as countChannels } from '../engine/devices';
   import type { LayerTarget } from '../engine/nowPlaying';
   import { app } from '../stores/app.svelte';
   import Modal from './Modal.svelte';
@@ -21,7 +21,8 @@
   let layer = $state(initial.layer);
 
   const device = $derived(app.deviceByName(deviceName));
-  const channelCount = $derived(device ? Math.max(1, channelFormats(device).length) : 99);
+  // Up to 99 while the server has not reported its channels.
+  const channelCount = $derived(countChannels(device) || 99);
 
   const whole = (event: Event, min: number, max: number): number | null => {
     const parsed = Number.parseInt((event.currentTarget as HTMLInputElement).value, 10);

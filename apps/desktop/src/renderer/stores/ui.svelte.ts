@@ -1,4 +1,4 @@
-export type DialogName = 'settings' | 'about' | 'openUrl' | 'help';
+export type DialogName = 'settings' | 'about' | 'openUrl' | 'help' | 'customColor';
 
 export interface ConfirmRequest {
   title: string;

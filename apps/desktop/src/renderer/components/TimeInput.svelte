@@ -10,12 +10,14 @@
     min?: number;
     max?: number;
     disabled?: boolean;
+    /** The selected items differ: shows empty with a hint, and any valid entry applies (also the current value). */
+    mixed?: boolean;
     onchange: (frames: number) => void;
   }
 
-  let { id, value, fps, dropFrame = false, min = 0, max, disabled = false, onchange }: Props = $props();
+  let { id, value, fps, dropFrame = false, min = 0, max, disabled = false, mixed = false, onchange }: Props = $props();
 
-  const shown = $derived(framesToTimecode(value, fps, dropFrame));
+  const shown = $derived(mixed ? '' : framesToTimecode(value, fps, dropFrame));
   let text = $state('');
   let editing = $state(false);
 
@@ -32,7 +34,7 @@
     }
     const clamped = Math.max(min, max === undefined ? parsed : Math.min(max, parsed));
     text = framesToTimecode(clamped, fps, dropFrame);
-    if (clamped !== value) onchange(clamped);
+    if (mixed || clamped !== value) onchange(clamped);
   }
 </script>
 
@@ -43,6 +45,7 @@
   inputmode="numeric"
   spellcheck="false"
   {disabled}
+  placeholder={mixed ? 'Multiple values' : undefined}
   title="hh:mm:ss:ff at {Math.round(fps * 100) / 100} fps"
   bind:value={text}
   onfocus={() => (editing = true)}

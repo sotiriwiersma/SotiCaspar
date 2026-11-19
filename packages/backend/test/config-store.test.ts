@@ -3,12 +3,19 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '@soticaspar/core';
 import type { DeviceConfig } from '@soticaspar/core';
-import { ConfigStore } from '../src/config-store';
+import { ConfigStore, LOCALHOST_DEVICE } from '../src/config-store';
 import { device as makeDevice, makeDataDir } from './helpers';
 
 const noLog = () => undefined;
 
 const device = (name: string, overrides: Partial<DeviceConfig> = {}): DeviceConfig => makeDevice(name, 5250, overrides);
+
+/** The data folder of an install that already saved an (empty) server list, so no Localhost server is added. */
+async function existingDataDir(): Promise<string> {
+  const dir = await makeDataDir();
+  await writeFile(join(dir, 'devices.json'), '[]');
+  return dir;
+}
 
 async function openStore(dir: string): Promise<ConfigStore> {
   const store = new ConfigStore(dir, noLog);
@@ -21,12 +28,35 @@ describe('ConfigStore', () => {
     const store = await openStore(await makeDataDir());
 
     expect(store.settings()).toEqual(DEFAULT_SETTINGS);
-    expect(store.devices()).toEqual([]);
+    expect(store.devices()).toEqual([LOCALHOST_DEVICE]);
     expect(store.openRecent()).toEqual([]);
   });
 
-  it('merges stored settings with the defaults and drops invalid values', async () => {
+  it('keeps valid custom colors and drops the rest', async () => {
+    const dir = await existingDataDir();
+    const customColors = [
+      { name: 'Brand', value: 'rgba(255, 0, 128, 255)' },
+      { name: '', value: 'rgba(0, 0, 0, 255)' },
+      { name: 'Brand', value: 'rgba(1, 2, 3, 255)' },
+      { name: 'NoValue', value: '' },
+      'junk'
+    ];
+    await writeFile(join(dir, 'settings.json'), JSON.stringify({ customColors }));
+
+    expect((await openStore(dir)).settings().customColors).toEqual([{ name: 'Brand', value: 'rgba(255, 0, 128, 255)' }]);
+  });
+
+  it('adds the Localhost server only on a new install', async () => {
     const dir = await makeDataDir();
+    const store = await openStore(dir);
+    expect(store.devices()).toMatchObject([{ name: 'Localhost', address: '127.0.0.1', port: 5250 }]);
+
+    await store.removeDevice('Localhost');
+    expect((await openStore(dir)).devices()).toEqual([]);
+  });
+
+  it('merges stored settings with the defaults and drops invalid values', async () => {
+    const dir = await existingDataDir();
     await writeFile(join(dir, 'settings.json'), JSON.stringify({ fontSize: 20, theme: 5, unknown: true, oscMonitorPort: null }));
 
     const settings = (await openStore(dir)).settings();
@@ -38,7 +68,7 @@ describe('ConfigStore', () => {
   });
 
   it('keeps the default properties of clips and drops what is not a plain value', async () => {
-    const dir = await makeDataDir();
+    const dir = await existingDataDir();
     await writeFile(
       join(dir, 'settings.json'),
       JSON.stringify({ clipDefaults: { MOVIE: { loop: true, channel: 2, nested: { a: 1 }, nothing: null, text: 'x' }, STILL: 'nope', AUDIO: {} }, delayType: 'Timecode' })
@@ -48,11 +78,11 @@ describe('ConfigStore', () => {
 
     expect(settings.clipDefaults).toEqual({ MOVIE: { loop: true, channel: 2, text: 'x' } });
     expect(settings.delayType).toBe('Timecode');
-    expect((await openStore(await makeDataDir())).settings().clipDefaults).toEqual({});
+    expect((await openStore(await existingDataDir())).settings().clipDefaults).toEqual({});
   });
 
   it('persists settings, devices, outputs and presets across restarts', async () => {
-    const dir = await makeDataDir();
+    const dir = await existingDataDir();
     const store = await openStore(dir);
     await store.updateSettings({ fontSize: 18 });
     await store.saveDevice(device('A', { description: 'main' }));
@@ -68,7 +98,7 @@ describe('ConfigStore', () => {
   });
 
   it('survives corrupt files and keeps a copy of them', async () => {
-    const dir = await makeDataDir();
+    const dir = await existingDataDir();
     await writeFile(join(dir, 'devices.json'), '{ not json');
     await writeFile(join(dir, 'settings.json'), '[]');
 
@@ -80,7 +110,7 @@ describe('ConfigStore', () => {
   });
 
   it('ignores invalid and duplicate device entries', async () => {
-    const dir = await makeDataDir();
+    const dir = await existingDataDir();
     await writeFile(
       join(dir, 'devices.json'),
       JSON.stringify([{ name: 'A', address: 'a', port: 1 }, { name: 'A', address: 'b' }, { name: '', address: 'c' }, { name: 'D' }, 'x'])
@@ -90,7 +120,7 @@ describe('ConfigStore', () => {
   });
 
   it('renames a device in place and rejects name clashes', async () => {
-    const store = await openStore(await makeDataDir());
+    const store = await openStore(await existingDataDir());
     await store.saveDevice(device('A'));
     await store.saveDevice(device('B'));
 
@@ -102,7 +132,7 @@ describe('ConfigStore', () => {
   });
 
   it('removes entries', async () => {
-    const store = await openStore(await makeDataDir());
+    const store = await openStore(await existingDataDir());
     await store.saveDevice(device('A'));
     await store.removeDevice('A');
     await store.removeDevice('missing');
@@ -111,7 +141,7 @@ describe('ConfigStore', () => {
   });
 
   it('stores what the server reported about a device', async () => {
-    const dir = await makeDataDir();
+    const dir = await existingDataDir();
     const store = await openStore(dir);
     await store.saveDevice(device('A'));
     await store.updateDeviceInfo('A', { version: '2.3.3', channels: 2, channelFormats: 'PAL,PAL' });
@@ -120,7 +150,7 @@ describe('ConfigStore', () => {
   });
 
   it('keeps the open recent list newest first, unique and bounded by the setting', async () => {
-    const dir = await makeDataDir();
+    const dir = await existingDataDir();
     const store = await openStore(dir);
     await store.updateSettings({ openRecent: 3 });
     for (const path of ['a', 'b', 'c', 'a', 'd']) await store.addOpenRecent(path);
@@ -133,7 +163,7 @@ describe('ConfigStore', () => {
   });
 
   it('serializes concurrent writes without losing updates', async () => {
-    const dir = await makeDataDir();
+    const dir = await existingDataDir();
     const store = await openStore(dir);
     await Promise.all(Array.from({ length: 20 }, (_, i) => store.saveDevice(device(`D${i}`))));
 
