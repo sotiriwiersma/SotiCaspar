@@ -21,7 +21,7 @@ anywhere. Settings are kept in `%APPDATA%\SotiCaspar`. Requires CasparCG Server 
 
 ## What's new
 
-**0.1.2**
+**0.1.3**
 
 - **Undo and redo** for every rundown edit: adding, pasting, duplicating, removing, moving, grouping and inspector
   changes. Ctrl+Z undoes, Ctrl+Y or Ctrl+Shift+Z redoes; also in the Edit menu and the rundown's right-click menu. Typing
